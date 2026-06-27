@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Autito Seco</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2EC864">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Autito Seco">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', sans-serif; background: #060A07; color: #EFF5F0; min-height: 100vh; }
+:root {
+  --bg-0:#060A07; --bg-1:#0B110C; --bg-2:#101814; --bg-3:#162018; --bg-4:#1C281E; --bg-5:#223025;
+  --text-1:#EFF5F0; --text-2:#94A896; --text-3:#4D6450;
+  --green:#2EC864; --green-400:#4AE880; --green-600:#1FA84E; --green-dim:#0A2010; --green-mid:#122818;
+  --amber:#E8C84A; --amber-dim:#201800;
+  --red:#E85A4A;   --red-dim:#200A08;
+  --blue:#4A9AE8;  --blue-dim:#081428;
+  --accent:#2EC864; --accent-dim:#0A2010;
+  --border:rgba(46,200,100,0.1); --border-hover:rgba(46,200,100,0.22);
+  --radius-sm:10px; --radius-md:14px; --radius-lg:20px; --radius-xl:28px;
+}
+input, select {
+  font-family:'DM Sans',sans-serif; background:var(--bg-3); border:1px solid var(--border);
+  color:var(--text-1); border-radius:var(--radius-sm); padding:12px 14px;
+  font-size:14px; width:100%; outline:none; transition:border-color .2s;
+}
+input:focus, select:focus { border-color:var(--accent); }
+input::placeholder { color:var(--text-3); }
+select option { background:var(--bg-2); }
+textarea {
+  font-family:'DM Sans',sans-serif; background:var(--bg-3); border:1px solid var(--border);
+  color:var(--text-1); border-radius:var(--radius-sm); padding:12px 14px;
+  font-size:14px; width:100%; outline:none; resize:vertical; transition:border-color .2s; display:block;
+}
+textarea:focus { border-color:var(--accent); }
+textarea::placeholder { color:var(--text-3); }
+::-webkit-scrollbar { width:4px; }
+::-webkit-scrollbar-thumb { background:var(--bg-4); border-radius:2px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useReducer, useCallback } = React;
+
+const STORE_KEY = 'autito_v1';
+const load = () => { try { return JSON.parse(localStorage.getItem(STORE_KEY)); } catch { return null; } };
+const save = d => localStorage.setItem(STORE_KEY, JSON.stringify(d));
+const todayStr = () => new Date().toISOString().slice(0,10);
+
+// ── Supabase Auth (solo login; autos/mantenimientos siguen en localStorage) ──
+const supabase = window.supabase.createClient(
+  'https://iiggstwvqbnhpfndgdol.supabase.co',
+  'sb_publishable_zfRqJm0TvdfinAt-KbrL-Q_n0RTcRLX'
+);
+const sessionToUser = u => ({ email: u.email, name: u.user_metadata?.name || u.email.split('@')[0] });
+
+// iconId identifica el ícono SVG a usar (sin emojis)
+const MAINTS_DEFAULT = [
+  { id:1, name:'Cubiertas',           cat:'monthly',  iconId:'tire',    iKm:null,  iDays:30,   trigger:'time', lastKm:null, lastDate:null, lastProduct:'', desc:'Revisión mensual de desgaste, presión y estado visual.', tip:'Presión recomendada: consultar manual del vehículo (generalmente 30-35 PSI).' },
+  { id:2, name:'Refrigerante',        cat:'monthly',  iconId:'temp',    iKm:null,  iDays:30,   trigger:'time', lastKm:null, lastDate:null, lastProduct:'', desc:'Control mensual del nivel de líquido refrigerante.',     tip:'Si baja frecuentemente puede indicar una pérdida. Revisá mangueras y radiador.' },
+  { id:3, name:'Cambio de aceite',    cat:'service',  iconId:'oil',     iKm:10000, iDays:365,  trigger:'both', lastKm:null, lastDate:null, lastProduct:'', desc:'Cambio de aceite motor. Lo que llegue primero: 10.000 km o 12 meses.',  tip:'Con aceite sintético el intervalo puede extenderse. Verificar con el fabricante.' },
+  { id:4, name:'Filtro de aire',      cat:'service',  iconId:'airflt',  iKm:15000, iDays:365,  trigger:'both', lastKm:null, lastDate:null, lastProduct:'', desc:'Reemplazo del filtro de aire cada 15.000 km o 12 meses.',               tip:'Un filtro sucio reduce potencia y aumenta el consumo.' },
+  { id:5, name:'Filtro de aceite',    cat:'service',  iconId:'oilflt',  iKm:10000, iDays:365,  trigger:'both', lastKm:null, lastDate:null, lastProduct:'', desc:'Se cambia junto con el aceite de motor.',                               tip:'Siempre cambiar el filtro junto con el aceite.' },
+  { id:6, name:'Filtro combustible',  cat:'service',  iconId:'fuel',    iKm:30000, iDays:730,  trigger:'both', lastKm:null, lastDate:null, lastProduct:'', desc:'Reemplazo cada 30.000 km o 2 años.',                                    tip:'Un filtro obstruido puede causar pérdida de potencia.' },
+  { id:7, name:'Líquido de frenos',   cat:'service',  iconId:'brake',   iKm:null,  iDays:730,  trigger:'time', lastKm:null, lastDate:null, lastProduct:'', desc:'Cambio cada 2 años. Absorbe humedad con el tiempo.',                    tip:'El líquido degradado puede causar falla de frenos.' },
+  { id:8, name:'Bujías',              cat:'service',  iconId:'spark',   iKm:30000, iDays:730,  trigger:'both', lastKm:null, lastDate:null, lastProduct:'', desc:'Reemplazo cada 30.000 km o 2 años (estándar).',                        tip:'Las bujías de iridio o platino duran hasta 100.000 km.' },
+  { id:9, name:'Correa distribución', cat:'service',  iconId:'belt',    iKm:80000, iDays:1825, trigger:'both', lastKm:null, lastDate:null, lastProduct:'', desc:'Reemplazo cada 80.000 km o 5 años.',                                   tip:'La rotura puede destruir el motor. No ignorar.' },
+];
+
+const initState = () => ({
+  user: null, vehicles: [], favoriteVehicleId: null,
+  docs: [], hist: [], workshop: [], dashView: 'grid',
+});
+
+const daysSince = d => d ? Math.floor((Date.now() - new Date(d).getTime()) / 86400000) : null;
+
+const getStatus = (m, currentKm) => {
+  if (!m.lastDate) return { color:'blue', label:'Sin registro', pct:0, health:0, kmLeft:null, daysLeft:null, registered:false };
+  const days = daysSince(m.lastDate);
+  let pctTime = m.iDays ? Math.min(days / m.iDays, 1) : 0;
+  let pctKm   = (m.iKm && m.lastKm != null && currentKm != null)
+    ? Math.min(Math.max(currentKm - m.lastKm, 0) / m.iKm, 1) : 0;
+  // wear = qué tan gastado está (0=nuevo, 1=vencido)
+  const wear = m.trigger==='time' ? pctTime : m.trigger==='km' ? pctKm : Math.max(pctTime, pctKm);
+  // health = salud restante (1=recién revisado, 0=vencido) — esto se muestra en la barra
+  const health = 1 - wear;
+  const kmLeft   = m.iKm && m.lastKm != null && currentKm != null ? Math.max(0, m.iKm-(currentKm-m.lastKm)) : null;
+  const daysLeft = m.iDays ? Math.max(0, m.iDays - days) : null;
+  let color, label;
+  if (wear>=1)        { color='red';   label='Urgente'; }
+  else if (wear>=0.8) { color='red';   label='Vencido pronto'; }
+  else if (wear>=0.6) { color='amber'; label='Próximo'; }
+  else               { color='green'; label='Al día'; }
+  return { color, label, pct:wear, health, kmLeft, daysLeft, registered:true };
+};
+
+const overallStatus = (maints, km) => {
+  const reg = maints.filter(m=>m.lastDate);
+  if (!reg.length) return { label:'Sin datos', color:'blue' };
+  const ss = reg.map(m=>getStatus(m,km));
+  if (ss.some(s=>s.color==='red'))   return { label:'Requiere atención', color:'red' };
+  if (ss.some(s=>s.color==='amber')) return { label:'Revisar pronto',    color:'amber' };
+  return { label:'Muy bien', color:'green' };
+};
+
+// ── Reducer ──────────────────────────────────────────────────────────
+const reducer = (s, a) => {
+  switch(a.type) {
+    case 'LOGIN':   return {...s, user:a.user};
+    case 'ADD_VEH': {
+      const v = {...a.v, id:Date.now(), maints:MAINTS_DEFAULT.map(m=>({...m}))};
+      return {...s, vehicles:[...s.vehicles,v], favoriteVehicleId:s.vehicles.length===0?v.id:s.favoriteVehicleId};
+    }
+    case 'SET_FAV': return {...s, favoriteVehicleId:a.id};
+    case 'UPD_KM':  return {...s, vehicles:s.vehicles.map(v=>v.id===a.vid?{...v,km:a.km}:v)};
+    case 'APPLY':   return {
+      ...s,
+      vehicles:s.vehicles.map(v=>v.id===a.vid?{...v,maints:v.maints.map(m=>m.id===a.mid?{...m,lastKm:a.km,lastDate:a.date,lastProduct:a.product||m.lastProduct||''}:m)}:v),
+      hist:[...s.hist,{mid:a.mid,vid:a.vid,km:a.km,date:a.date,product:a.product||''}]
+    };
+    case 'TOGGLE_CAT': return {
+      ...s,
+      vehicles:s.vehicles.map(v=>v.id===a.vid?{...v,maints:v.maints.map(m=>m.id===a.mid?{...m,cat:m.cat==='monthly'?'service':'monthly'}:m)}:v)
+    };
+    case 'UPD_MAINT_INTERVAL': return {
+      ...s,
+      vehicles:s.vehicles.map(v=>v.id===a.vid?{...v,maints:v.maints.map(m=>m.id===a.mid?{...m,...a.changes}:m)}:v)
+    };
+    case 'ADD_DOC':  return {...s, docs:[...s.docs,a.doc]};
+    case 'DEL_DOC':  return {...s, docs:s.docs.filter(d=>d.id!==a.id)};
+    case 'ADD_WORK': return {...s, workshop:[...(s.workshop||[]),a.entry]};
+    case 'UPD_WORK': return {...s, workshop:(s.workshop||[]).map(w=>w.id===a.entry.id?a.entry:w)};
+    case 'DEL_WORK': return {...s, workshop:(s.workshop||[]).filter(w=>w.id!==a.id)};
+    case 'SET_DASH_VIEW': return {...s, dashView:a.view};
+    case 'RESET':    return initState();
+    default: return s;
+  }
+};
+
+// ── UI Primitives ─────────────────────────────────────────────────────
+const cMap = { green:'var(--green)', amber:'var(--amber)', red:'var(--red)', blue:'var(--blue)' };
+const cDim  = { green:'var(--green-dim)', amber:'var(--amber-dim)', red:'var(--red-dim)', blue:'var(--blue-dim)' };
+
+// ── Sistema de íconos SVG profesionales ──────────────────────────────
+const ICONS = {
+  tire:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="3" x2="12" y2="8"/><line x1="12" y1="16" x2="12" y2="21"/><line x1="3" y1="12" x2="8" y2="12"/><line x1="16" y1="12" x2="21" y2="12"/></svg>,
+  temp:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>,
+  oil:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 2C6 8 4 12 4 15a8 8 0 0 0 16 0c0-3-2-7-8-13z"/></svg>,
+  airflt: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="7" width="18" height="10" rx="3"/><line x1="7" y1="7" x2="7" y2="17"/><line x1="12" y1="7" x2="12" y2="17"/><line x1="17" y1="7" x2="17" y2="17"/></svg>,
+  oilflt: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M10 2h4l1 4H9l1-4z"/><path d="M9 6l-1 14h8L15 6"/><line x1="9" y1="11" x2="15" y2="11"/></svg>,
+  fuel:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="3" width="12" height="18" rx="2"/><path d="M15 7h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2"/><line x1="7" y1="8" x2="11" y2="8"/></svg>,
+  brake:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg>,
+  spark:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>,
+  belt:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><ellipse cx="7" cy="12" rx="3" ry="5"/><ellipse cx="17" cy="12" rx="3" ry="5"/><line x1="7" y1="7" x2="17" y2="7"/><line x1="7" y1="17" x2="17" y2="17"/></svg>,
+  wrench: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>,
+  car:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M5 17H3a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1l3-4h10l3 4h1a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2"/><circle cx="7.5" cy="17" r="1.5"/><circle cx="16.5" cy="17" r="1.5"/><line x1="9" y1="17" x2="15" y2="17"/></svg>,
+  doc:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>,
+  shield: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
+  card:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>,
+  receipt:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1z"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="14" y2="14"/></svg>,
+  clip:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>,
+  home:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  hist:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+  folder: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
+  user:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+  tag:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>,
+  phone:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.56 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.18 6.18l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>,
+  edit:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+  trash:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>,
+  plus:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+  check:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>,
+  chevR:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>,
+  chevD:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>,
+  back:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>,
+  star:   <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
+  starO:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
+  faq:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
+  gear:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
+  logout: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
+  warn:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
+  km:     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>,
+};
+
+const Icon = ({id, size=20, color='currentColor', style={}}) => {
+  const svg = ICONS[id];
+  if (!svg) return null;
+  return (
+    <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:size,height:size,flexShrink:0,color,...style}}>
+      {React.cloneElement(svg, {width:size,height:size})}
+    </span>
+  );
+};
+
+const Badge = ({color,label}) => (
+  <span style={{background:cDim[color],color:cMap[color],fontSize:11,fontWeight:700,padding:'3px 10px',borderRadius:99,whiteSpace:'nowrap'}}>{label}</span>
+);
+const Bar = ({health, color}) => (
+  <div style={{height:5,background:'var(--bg-4)',borderRadius:99,overflow:'hidden'}}>
+    <div style={{height:'100%',width:`${Math.min(Math.round(health*100),100)}%`,background:cMap[color],borderRadius:99,boxShadow:`0 0 8px ${cMap[color]}50`,transition:'width .5s'}}/>
+  </div>
+);
+const Btn = ({children,onClick,v='primary',sz='md',style={},disabled=false}) => {
+  const bv={primary:{bg:'var(--accent)',color:'#060A07',border:'none'},secondary:{bg:'var(--bg-3)',color:'var(--text-1)',border:'1px solid var(--border)'},ghost:{bg:'transparent',color:'var(--text-2)',border:'1px solid var(--border)'},danger:{bg:'var(--red-dim)',color:'var(--red)',border:'1px solid rgba(232,90,74,.2)'},success:{bg:'var(--green-dim)',color:'var(--green)',border:'1px solid rgba(46,200,100,.2)'}}[v];
+  const bs={sm:{p:'7px 14px',fs:'12px'},md:{p:'10px 18px',fs:'14px'},lg:{p:'14px 26px',fs:'15px'}}[sz];
+  return <button onClick={onClick} disabled={disabled} style={{background:bv.bg,color:bv.color,border:bv.border,padding:bs.p,fontSize:bs.fs,fontWeight:700,fontFamily:'DM Sans,sans-serif',borderRadius:'var(--radius-md)',cursor:disabled?'not-allowed':'pointer',display:'inline-flex',alignItems:'center',gap:6,opacity:disabled?.5:1,transition:'all .15s',whiteSpace:'nowrap',...style}}>{children}</button>;
+};
+const CarSVG = ({c='#2EC864'}) => (
+  <svg viewBox="0 0 220 90" fill="none" style={{width:'100%',maxWidth:220,filter:`drop-shadow(0 8px 28px ${c}35)`}}>
+    <defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={c} stopOpacity=".9"/><stop offset="100%" stopColor={c} stopOpacity=".45"/></linearGradient></defs>
+    <rect x="18" y="42" width="184" height="30" rx="10" fill="url(#cg)"/>
+    <path d="M55 42L75 18h70l20 24Z" fill={c} fillOpacity=".8"/>
+    <rect x="78" y="22" width="26" height="16" rx="3" fill="rgba(200,240,220,.25)"/>
+    <rect x="110" y="22" width="26" height="16" rx="3" fill="rgba(200,240,220,.25)"/>
+    <rect x="18" y="64" width="42" height="7" rx="3" fill={c} fillOpacity=".4"/>
+    <rect x="160" y="64" width="42" height="7" rx="3" fill={c} fillOpacity=".4"/>
+    <circle cx="60" cy="72" r="14" fill="#060A07"/><circle cx="60" cy="72" r="10" fill="#162018"/><circle cx="60" cy="72" r="5" fill={c} fillOpacity=".55"/>
+    <circle cx="160" cy="72" r="14" fill="#060A07"/><circle cx="160" cy="72" r="10" fill="#162018"/><circle cx="160" cy="72" r="5" fill={c} fillOpacity=".55"/>
+    <rect x="22" y="50" width="14" height="7" rx="2" fill="rgba(255,220,80,.6)"/>
+    <rect x="184" y="50" width="14" height="7" rx="2" fill="rgba(232,90,74,.45)"/>
+  </svg>
+);
+const CAR_COLORS = [
+  {name:'Blanco',hex:'#F0EEE8'},{name:'Plata',hex:'#B0B0C0'},{name:'Gris',hex:'#6A6878'},{name:'Negro',hex:'#2A2A35'},
+  {name:'Rojo',hex:'#D63030'},{name:'Bordo',hex:'#8B1A2A'},{name:'Naranja',hex:'#E07820'},{name:'Amarillo',hex:'#D4B800'},
+  {name:'Verde',hex:'#2A8A4A'},{name:'Azul mar.',hex:'#1A3A7A'},{name:'Azul',hex:'#3A7EC8'},{name:'Celeste',hex:'#5BB8D4'},
+  {name:'Violeta',hex:'#6C3FA0'},{name:'Rosa',hex:'#C060A0'},{name:'Beige',hex:'#C8B090'},{name:'Marrón',hex:'#7A4A2A'},
+];
+const ColorPicker = ({value,onChange}) => (
+  <div>
+    <label style={{fontSize:12,color:'var(--text-3)',display:'block',marginBottom:8,fontWeight:500}}>Color del vehículo</label>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(8,1fr)',gap:8}}>
+      {CAR_COLORS.map(c=>(
+        <button key={c.hex} title={c.name} onClick={()=>onChange(c.hex)} style={{width:'100%',aspectRatio:'1',borderRadius:'50%',background:c.hex,border:value===c.hex?'3px solid var(--accent)':'2px solid rgba(255,255,255,0.1)',cursor:'pointer',transition:'transform .15s',transform:value===c.hex?'scale(1.2)':'scale(1)',boxShadow:value===c.hex?`0 0 10px ${c.hex}80`:'none'}}/>
+      ))}
+    </div>
+    {value&&<p style={{fontSize:11,color:'var(--text-3)',marginTop:8}}>Seleccionado: {CAR_COLORS.find(c=>c.hex===value)?.name||value}</p>}
+  </div>
+);
+
+// ── VehicleForm ───────────────────────────────────────────────────────
+const VehicleForm = ({onComplete,onCancel,title,subtitle}) => {
+  const [f,setF]=useState({brand:'',model:'',year:String(new Date().getFullYear()),plate:'',km:'',color:''});
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  const valid=f.brand&&f.model&&f.plate&&f.km&&f.color;
+  return (
+    <div style={{minHeight:'100vh',background:'var(--bg-0)',padding:'36px 20px 40px'}}>
+      <div style={{maxWidth:400,margin:'0 auto'}}>
+        {onCancel&&<button onClick={onCancel} style={{background:'none',border:'none',color:'var(--text-2)',cursor:'pointer',fontSize:22,marginBottom:16,padding:'0 4px',lineHeight:1}}>←</button>}
+        <p style={{fontSize:12,color:'var(--accent)',fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase',marginBottom:8}}>{title||'Nuevo vehículo'}</p>
+        <h2 style={{fontSize:24,fontWeight:700,marginBottom:6}}>Registrá tu vehículo</h2>
+        {subtitle&&<p style={{color:'var(--text-2)',fontSize:13,marginBottom:28}}>{subtitle}</p>}
+        <div style={{display:'flex',justifyContent:'center',marginBottom:28}}><CarSVG c={f.color||'#7C6FFF'}/></div>
+        {[{k:'brand',l:'Marca',ph:'Toyota, Ford, VW...'},{k:'model',l:'Modelo',ph:'Corolla, Focus...'},{k:'year',l:'Año',ph:'2020',t:'number'},{k:'plate',l:'Patente',ph:'ABC123'},{k:'km',l:'Kilometraje actual',ph:'45000',t:'number'}].map(ff=>(
+          <div key={ff.k} style={{marginBottom:12}}>
+            <label style={{fontSize:12,color:'var(--text-3)',display:'block',marginBottom:5,fontWeight:500}}>{ff.l}</label>
+            <input type={ff.t||'text'} value={f[ff.k]} onChange={e=>set(ff.k,e.target.value)} placeholder={ff.ph}/>
+          </div>
+        ))}
+        <div style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-lg)',padding:'16px',marginBottom:12,marginTop:4}}>
+          <ColorPicker value={f.color} onChange={v=>set('color',v)}/>
+        </div>
+        {!f.color&&<p style={{fontSize:12,color:'var(--amber)',marginBottom:12}}>⚠ Seleccioná un color para continuar</p>}
+        <Btn onClick={()=>valid&&onComplete({...f,km:Number(f.km),year:Number(f.year),addedDate:new Date().toISOString()})} disabled={!valid} style={{width:'100%',justifyContent:'center',marginTop:4}} sz="lg">
+          {onCancel?'Agregar vehículo →':'Ir al dashboard →'}
+        </Btn>
+      </div>
+    </div>
+  );
+};
+
+// ── Login ─────────────────────────────────────────────────────────────
+const Login = ({onLogin}) => {
+  const [mode,setMode]=useState('login');
+  const [email,setEmail]=useState('');
+  const [pass,setPass]=useState('');
+  const [name,setName]=useState('');
+  const [loading,setLoading]=useState(false);
+  const [error,setError]=useState('');
+  const [info,setInfo]=useState('');
+
+  const go = async () => {
+    if (!email||!pass||loading) return;
+    setLoading(true); setError(''); setInfo('');
+    if (mode==='register') {
+      const { data, error } = await supabase.auth.signUp({ email, password:pass, options:{ data:{ name:name||email.split('@')[0] } } });
+      setLoading(false);
+      if (error) { setError(error.message); return; }
+      if (!data.session) { setInfo('Revisá tu email para confirmar la cuenta antes de ingresar.'); return; }
+      onLogin(sessionToUser(data.user));
+    } else {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password:pass });
+      setLoading(false);
+      if (error) { setError(error.message==='Invalid login credentials'?'Email o contraseña incorrectos.':error.message); return; }
+      onLogin(sessionToUser(data.user));
+    }
+  };
+
+  return (
+    <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px 20px'}}>
+      <div style={{textAlign:'center',marginBottom:36}}>
+        <div style={{width:56,height:56,borderRadius:16,background:'var(--accent-dim)',border:'1px solid rgba(46,200,100,.3)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 14px'}}>
+          <Icon id="car" size={28} color="var(--green)"/>
+        </div>
+        <h1 style={{fontFamily:'DM Sans',fontSize:26,fontWeight:800,letterSpacing:'-.02em'}}>Autito Seco</h1>
+        <p style={{color:'var(--text-2)',fontSize:14,marginTop:6}}>El historial clínico de tu vehículo</p>
+      </div>
+      <div style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-xl)',padding:'28px 24px',width:'100%',maxWidth:360}}>
+        <div style={{display:'flex',background:'var(--bg-3)',borderRadius:'var(--radius-md)',padding:4,marginBottom:22}}>
+          {['login','register'].map(m=>(
+            <button key={m} onClick={()=>{setMode(m);setError('');setInfo('');}} style={{flex:1,padding:'8px',border:'none',borderRadius:'var(--radius-sm)',background:mode===m?'var(--accent)':'transparent',color:mode===m?'#fff':'var(--text-2)',fontFamily:'Sora,sans-serif',fontSize:13,fontWeight:500,cursor:'pointer',transition:'all .2s'}}>
+              {m==='login'?'Ingresar':'Registrarse'}
+            </button>
+          ))}
+        </div>
+        {mode==='register'&&<div style={{marginBottom:12}}><label style={{fontSize:12,color:'var(--text-3)',display:'block',marginBottom:5}}>Nombre</label><input value={name} onChange={e=>setName(e.target.value)} placeholder="Tu nombre"/></div>}
+        <div style={{marginBottom:12}}><label style={{fontSize:12,color:'var(--text-3)',display:'block',marginBottom:5}}>Email</label><input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="tu@email.com"/></div>
+        <div style={{marginBottom:22}}><label style={{fontSize:12,color:'var(--text-3)',display:'block',marginBottom:5}}>Contraseña</label><input type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="••••••••" onKeyDown={e=>e.key==='Enter'&&go()}/></div>
+        {error&&<p style={{fontSize:12,color:'var(--red)',marginBottom:14}}>{error}</p>}
+        {info&&<p style={{fontSize:12,color:'var(--amber)',marginBottom:14}}>{info}</p>}
+        <Btn onClick={go} disabled={!email||!pass||loading} style={{width:'100%',justifyContent:'center'}} sz="lg">
+          {loading?'Cargando…':mode==='login'?'Ingresar →':'Crear cuenta →'}
+        </Btn>
+      </div>
+    </div>
+  );
+};
+
+const MaintDetail = ({m, vehicle, onApply, onBack, onToggleCat, dispatch}) => {
+  const s = getStatus(m, vehicle.km);
+  const days = daysSince(m.lastDate);
+  const [customDate, setCustomDate] = useState(todayStr());
+  const [customKm,   setCustomKm]   = useState(vehicle.km ? String(vehicle.km) : '');
+  const [product,    setProduct]    = useState(m.lastProduct || '');
+  const isToday = customDate === todayStr();
+  const isPast  = customDate < todayStr();
+  const kmVal   = customKm ? Number(customKm) : vehicle.km;
+  const kmHigher = customKm && Number(customKm) > vehicle.km;
+
+  const nextInfo = () => {
+    if (!s.registered) return null;
+    const parts=[];
+    if (s.daysLeft!==null) parts.push(`${s.daysLeft} días`);
+    if (s.kmLeft!==null)   parts.push(`${s.kmLeft.toLocaleString('es-AR')} km`);
+    if (!parts.length) return null;
+    return m.trigger==='both'?`Vence en lo que llegue primero: ${parts.join(' o ')}`:`Vence en: ${parts[0]}`;
+  };
+  const pctD = s.registered ? Math.min(Math.round(s.health*100),100) : 0;
+
+  const handleApply = () => {
+    const isoDate = new Date(customDate+'T12:00:00').toISOString();
+    onApply(isoDate, kmVal, product);
+  };
+
+  return (
+    <div style={{minHeight:'100vh',background:'var(--bg-0)',paddingBottom:90}}>
+      <div style={{background:'var(--bg-1)',borderBottom:'1px solid var(--border)',padding:'16px 20px',display:'flex',alignItems:'center',gap:12,position:'sticky',top:0,zIndex:10}}>
+        <button onClick={onBack} style={{background:'none',border:'none',color:'var(--text-2)',cursor:'pointer',padding:'0 4px',lineHeight:1,display:'flex'}}><Icon id="back" size={22}/></button>
+        <h2 style={{fontSize:17,fontWeight:700}}>{m.name}</h2>
+      </div>
+      <div style={{padding:'24px 20px'}}>
+        <div style={{textAlign:'center',marginBottom:24}}>
+          <div style={{width:72,height:72,borderRadius:22,background:'var(--bg-3)',border:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 12px'}}>
+            <Icon id={m.iconId||'wrench'} size={36} color="var(--green)"/>
+          </div>
+          <Badge color={s.color} label={s.label}/>
+          <p style={{color:'var(--text-2)',fontSize:13,marginTop:10,lineHeight:1.5}}>{m.desc}</p>
+          <button onClick={onToggleCat} style={{marginTop:10,background:'none',border:'none',color:'var(--text-3)',fontSize:11,cursor:'pointer',fontFamily:'DM Sans,sans-serif',textDecoration:'underline',textDecorationStyle:'dotted'}}>
+            {m.cat==='monthly'?'Mover a Mantenimiento':'Mover a Controles mensuales'}
+          </button>
+        </div>
+
+        <div style={{background:'var(--bg-2)',borderRadius:'var(--radius-xl)',padding:'20px 18px',marginBottom:16,border:'1px solid var(--border)'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+            <p style={{fontSize:12,color:'var(--text-3)'}}>{s.registered?'Estado de salud':'Sin registros aún'}</p>
+            <p style={{fontFamily:'Space Mono',fontSize:20,fontWeight:700,color:cMap[s.color]}}>{s.registered?`${pctD}%`:'—'}</p>
+          </div>
+          <div style={{height:12,background:'var(--bg-4)',borderRadius:99,overflow:'hidden',marginBottom:10}}>
+            <div style={{height:'100%',width:`${pctD}%`,background:cMap[s.color],borderRadius:99,boxShadow:`0 0 12px ${cMap[s.color]}50`,transition:'width .6s'}}/>
+          </div>
+          {nextInfo()&&<p style={{fontSize:12,color:s.pct>=0.6?cMap[s.color]:'var(--text-3)'}}>{nextInfo()}</p>}
+        </div>
+
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:18}}>
+          {[['Último mant.',m.lastDate?new Date(m.lastDate).toLocaleDateString('es-AR'):'—'],['Días desde rev.',days!==null?`${days} días`:'—'],['KM en revisión',m.lastKm!=null?m.lastKm.toLocaleString('es-AR')+' km':'—'],['KM restantes',s.kmLeft!==null?s.kmLeft.toLocaleString('es-AR')+' km':(m.iKm?'Ingresar KM':'N/A')]].map(([l,v])=>(
+            <div key={l} style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-md)',padding:'12px 14px'}}>
+              <p style={{fontSize:11,color:'var(--text-3)',marginBottom:4}}>{l}</p>
+              <p style={{fontWeight:700,fontSize:14,fontFamily:'Space Mono'}}>{v}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Última marca/producto usada */}
+        {m.lastProduct&&(
+          <div style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-md)',padding:'12px 14px',marginBottom:18,display:'flex',alignItems:'center',gap:10}}>
+            <Icon id="tag" size={16} color="var(--text-3)"/>
+            <div>
+              <p style={{fontSize:11,color:'var(--text-3)'}}>Último producto usado</p>
+              <p style={{fontSize:13,fontWeight:600,marginTop:2}}>{m.lastProduct}</p>
+            </div>
+          </div>
+        )}
+
+        {m.tip&&<div style={{background:'var(--accent-dim)',border:'1px solid rgba(46,200,100,.15)',borderRadius:'var(--radius-md)',padding:'12px 14px',marginBottom:18}}><p style={{fontSize:12,color:'rgba(100,220,140,.9)',lineHeight:1.5}}>💡 {m.tip}</p></div>}
+
+        <div style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-xl)',padding:'20px',marginBottom:12}}>
+          <p style={{fontSize:13,fontWeight:700,marginBottom:16}}>Registrar revisión</p>
+          <div style={{marginBottom:14}}>
+            <label style={{fontSize:12,color:'var(--text-3)',display:'block',marginBottom:6}}>Fecha de la revisión</label>
+            <input type="date" value={customDate} max={todayStr()} onChange={e=>setCustomDate(e.target.value)}/>
+            {isPast&&customDate&&<p style={{fontSize:11,color:'var(--amber)',marginTop:5}}>Retroactivo — {Math.abs(Math.floor((new Date(customDate+'T12:00:00')-new Date())/86400000))} días atrás</p>}
+            {isToday&&<p style={{fontSize:11,color:'var(--green)',marginTop:5}}>✓ Hoy</p>}
+          </div>
+          <div style={{marginBottom:14}}>
+            <label style={{fontSize:12,color:'var(--text-3)',display:'block',marginBottom:6}}>KM al momento de la revisión</label>
+            <input type="number" value={customKm} onChange={e=>setCustomKm(e.target.value)} placeholder={vehicle.km?`KM actual: ${Number(vehicle.km).toLocaleString('es-AR')}`:'Ingresá los km'}/>
+            {kmHigher&&(
+              <div style={{background:'var(--amber-dim)',border:'1px solid rgba(232,200,74,.2)',borderRadius:'var(--radius-md)',padding:'10px 14px',marginTop:8,display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
+                <p style={{fontSize:12,color:'var(--amber)',lineHeight:1.4}}>El KM ingresado es mayor al registrado. ¿Actualizás el odómetro también?</p>
+                <button onClick={()=>dispatch({type:'UPD_KM',vid:vehicle.id,km:Number(customKm)})} style={{background:'var(--amber)',color:'#060A07',border:'none',borderRadius:'var(--radius-sm)',padding:'6px 12px',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'DM Sans,sans-serif',whiteSpace:'nowrap',flexShrink:0}}>Actualizar</button>
+              </div>
+            )}
+          </div>
+          <div style={{marginBottom:18}}>
+            <label style={{fontSize:12,color:'var(--text-3)',display:'block',marginBottom:6}}>
+              Marca / Producto utilizado <span style={{fontWeight:400,opacity:.6}}>(opcional)</span>
+            </label>
+            <input value={product} onChange={e=>setProduct(e.target.value)} placeholder={m.lastProduct?`Último: ${m.lastProduct}`:'Ej: Castrol 5W30, Prestone, Mann Filter...'}/>
+          </div>
+          <Btn onClick={handleApply} v="success" sz="lg" style={{width:'100%',justifyContent:'center'}}><Icon id="check" size={16} color="var(--green)"/> Confirmar revisión</Btn>
+        </div>
+        <p style={{textAlign:'center',fontSize:11,color:'var(--text-3)'}}>Podés ingresar una fecha pasada si te olvidaste de registrarlo</p>
+      </div>
+    </div>
+  );
+};
+
+// ── WorkshopForm — DEFINIDO FUERA de Workshop para evitar re-mounts ───
+const WF_EMPTY = {date:'',place:'',person:'',phone:'',description:'',result:'',cost:''};
+const WorkshopForm = ({initial, title, onSave, onCancel}) => {
+  const [f, setF] = useState(() => initial ? {...initial} : {...WF_EMPTY});
+  const set = useCallback((k,v) => setF(p=>({...p,[k]:v})), []);
+  const valid = f.date && f.place && f.description;
+  return (
+    <div style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-xl)',padding:'20px 18px',marginBottom:20}}>
+      <h3 style={{fontSize:16,fontWeight:700,marginBottom:18}}>{title}</h3>
+      <div style={{marginBottom:12}}>
+        <label style={{fontSize:12,color:'var(--text-3)',display:'block',marginBottom:5}}>Fecha <span style={{color:'var(--red)'}}>*</span></label>
+        <input type="date" value={f.date} max={todayStr()} onChange={e=>set('date',e.target.value)}/>
+      </div>
+      <div style={{marginBottom:12}}>
+        <label style={{fontSize:12,color:'var(--text-3)',display:'block',marginBottom:5}}>Lugar / Taller <span style={{color:'var(--red)'}}>*</span></label>
+        <input value={f.place} onChange={e=>set('place',e.target.value)} placeholder="Ej: Taller Rodríguez..."/>
+      </div>
+      <div style={{marginBottom:12}}>
+        <label style={{fontSize:12,color:'var(--text-3)',display:'block',marginBottom:5}}>Persona / Mecánico</label>
+        <input value={f.person} onChange={e=>set('person',e.target.value)} placeholder="Nombre del responsable"/>
+      </div>
+      <div style={{marginBottom:12}}>
+        <label style={{fontSize:12,color:'var(--text-3)',display:'block',marginBottom:5}}>Teléfono</label>
+        <input type="tel" value={f.phone} onChange={e=>set('phone',e.target.value)} placeholder="Ej: 11 4567-8901"/>
+      </div>
+      <div style={{marginBottom:12}}>
+        <label style={{fontSize:12,color:'var(--text-3)',display:'block',marginBottom:5}}>Descripción del trabajo <span style={{color:'var(--red)'}}>*</span></label>
+        <textarea rows={3} value={f.description} onChange={e=>set('description',e.target.value)} placeholder="¿Qué se hizo? Ej: Cambio de aceite 5W30, filtro de aceite..."/>
+      </div>
+      <div style={{marginBottom:12}}>
+        <label style={{fontSize:12,color:'var(--text-3)',display:'block',marginBottom:5}}>Resultado / Observaciones</label>
+        <textarea rows={2} value={f.result} onChange={e=>set('result',e.target.value)} placeholder="¿Qué encontraron? Observaciones..."/>
+      </div>
+      <div style={{marginBottom:20}}>
+        <label style={{fontSize:12,color:'var(--text-3)',display:'block',marginBottom:5}}>Costo total</label>
+        <input type="text" value={f.cost} onChange={e=>set('cost',e.target.value)} placeholder="Ej: 45000"/>
+      </div>
+      <div style={{display:'flex',gap:10}}>
+        <Btn onClick={onCancel} v="ghost" style={{flex:1,justifyContent:'center'}}>Cancelar</Btn>
+        <Btn onClick={()=>valid&&onSave(f)} disabled={!valid} style={{flex:1,justifyContent:'center'}}>Guardar</Btn>
+      </div>
+    </div>
+  );
+};
+
+// ── Dashboard ─────────────────────────────────────────────────────────
+const Dashboard = ({state, dispatch, vehicle, vehicles, onNav}) => {
+  const [kmModal,  setKmModal]  = useState(false);
+  const [newKm,    setNewKm]    = useState('');
+  const [detail,   setDetail]   = useState(null);
+  const [vcModal,  setVcModal]  = useState(false); // selector de vehículo
+  const view = state.dashView || 'list';
+
+  const ov = overallStatus(vehicle.maints, vehicle.km);
+  const carColor = vehicle.color || '#7C6FFF';
+
+  const applyMaint = (m, date, km, product) => {
+    dispatch({type:'APPLY', vid:vehicle.id, mid:m.id, km, date, product});
+    setDetail(null);
+  };
+
+  if (detail) {
+    const cur = vehicle.maints.find(m=>m.id===detail.id);
+    return <MaintDetail m={cur} vehicle={vehicle} dispatch={dispatch}
+      onApply={(date,km,product)=>applyMaint(cur,date,km,product)}
+      onBack={()=>setDetail(null)}
+      onToggleCat={()=>{ dispatch({type:'TOGGLE_CAT',vid:vehicle.id,mid:cur.id}); setDetail(null); }}
+    />;
+  }
+
+  const CardList = ({m}) => {
+    const s=getStatus(m,vehicle.km); const days=daysSince(m.lastDate);
+    const sub=()=>{ if(!s.registered)return'Sin registro'; if(s.kmLeft!==null&&s.daysLeft!==null)return`${s.kmLeft.toLocaleString('es-AR')} km · ${s.daysLeft}d`; if(s.kmLeft!==null)return`${s.kmLeft.toLocaleString('es-AR')} km restantes`; if(s.daysLeft!==null)return`${s.daysLeft} días restantes`; return`Hace ${days} días`; };
+    return (
+      <div onClick={()=>setDetail(m)} style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-lg)',padding:'14px 16px',cursor:'pointer',transition:'all .15s'}} onMouseOver={e=>{e.currentTarget.style.background='var(--bg-3)';e.currentTarget.style.borderColor='var(--border-hover)';}} onMouseOut={e=>{e.currentTarget.style.background='var(--bg-2)';e.currentTarget.style.borderColor='var(--border)';}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            <div style={{width:38,height:38,borderRadius:11,background:'var(--bg-3)',border:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+              <Icon id={m.iconId||'wrench'} size={20} color={s.registered?(s.color==='green'?'var(--green)':s.color==='amber'?'var(--amber)':'var(--red)'):'var(--text-3)'}/>
+            </div>
+            <div><p style={{fontWeight:600,fontSize:14}}>{m.name}</p><p style={{fontSize:11,color:s.pct>=0.8?cMap[s.color]:'var(--text-3)',marginTop:2}}>{sub()}</p></div>
+          </div>
+          <Badge color={s.color} label={s.label}/>
+        </div>
+        <Bar health={s.registered?s.health:0} color={s.color}/>
+      </div>
+    );
+  };
+
+  const CardGrid = ({m}) => {
+    const s=getStatus(m,vehicle.km); const healthD=s.registered?Math.min(Math.round(s.health*100),100):0;
+    const sub=()=>{ if(!s.registered)return'Sin datos'; if(s.daysLeft!==null)return`${s.daysLeft}d`; if(s.kmLeft!==null)return`${s.kmLeft.toLocaleString('es-AR')}km`; return`${daysSince(m.lastDate)}d`; };
+    const iconColor = s.registered?(s.color==='green'?'var(--green)':s.color==='amber'?'var(--amber)':'var(--red)'):'var(--text-3)';
+    return (
+      <div onClick={()=>setDetail(m)} style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-lg)',padding:'14px 12px',cursor:'pointer',transition:'all .15s',display:'flex',flexDirection:'column',gap:8}} onMouseOver={e=>{e.currentTarget.style.background='var(--bg-3)';e.currentTarget.style.borderColor='var(--border-hover)';}} onMouseOut={e=>{e.currentTarget.style.background='var(--bg-2)';e.currentTarget.style.borderColor='var(--border)';}}>
+        <div style={{width:34,height:34,borderRadius:10,background:'var(--bg-3)',border:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <Icon id={m.iconId||'wrench'} size={18} color={iconColor}/>
+        </div>
+        <p style={{fontWeight:600,fontSize:13,lineHeight:1.2}}>{m.name}</p>
+        <Bar health={s.registered?s.health:0} color={s.color}/>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <span style={{fontSize:10,color:'var(--text-3)'}}>{sub()}</span>
+          <Badge color={s.color} label={s.pct>=1?'Urgente':s.pct>=0.6?'Próximo':s.registered?'OK':'—'}/>
+        </div>
+        {s.registered&&<p style={{fontFamily:'Space Mono',fontSize:13,fontWeight:700,color:cMap[s.color]}}>{healthD}%</p>}
+      </div>
+    );
+  };
+
+  const monthly = vehicle.maints.filter(m=>m.cat==='monthly');
+  const service = vehicle.maints.filter(m=>m.cat==='service');
+  const isGrid  = view==='grid';
+  const cols    = isGrid ? 'repeat(2,1fr)' : '1fr';
+
+  return (
+    <div style={{background:'var(--bg-0)',minHeight:'100vh',paddingBottom:80}}>
+      {/* Header */}
+      <div style={{background:'linear-gradient(180deg,var(--bg-2) 0%,var(--bg-0) 100%)',padding:'24px 20px 20px',borderBottom:'1px solid var(--border)'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:18}}>
+          <div>
+            <p style={{fontSize:11,color:'var(--text-3)',letterSpacing:'.08em',textTransform:'uppercase',fontWeight:600,marginBottom:4}}>Mi vehículo</p>
+            {/* Nombre + selector si hay más de 1 auto */}
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <h1 style={{fontSize:22,fontWeight:700}}>{vehicle.brand} {vehicle.model}</h1>
+              {vehicles.length>1&&<button onClick={()=>setVcModal(true)} style={{background:'var(--bg-3)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text-3)',fontSize:11,padding:'2px 7px',cursor:'pointer',fontFamily:'Sora,sans-serif'}}>Cambiar auto ↕</button>}
+            </div>
+            <p style={{fontSize:13,color:'var(--text-2)',marginTop:4}}>
+              <span style={{fontFamily:'Space Mono',background:'var(--bg-3)',padding:'2px 8px',borderRadius:6,fontSize:12,marginRight:8}}>{vehicle.plate.toUpperCase()}</span>
+              {vehicle.year}
+            </p>
+          </div>
+          <Badge color={ov.color} label={ov.label}/>
+        </div>
+        <div style={{display:'flex',justifyContent:'center',marginBottom:16}}><CarSVG c={carColor}/></div>
+        <div style={{background:'var(--bg-3)',borderRadius:'var(--radius-md)',padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',border:'1px solid var(--border)'}}>
+          <div>
+            <p style={{fontSize:11,color:'var(--text-3)',marginBottom:2}}>Kilometraje actual</p>
+            <p style={{fontFamily:'Space Mono',fontSize:22,fontWeight:700}}>{Number(vehicle.km).toLocaleString('es-AR')} km</p>
+          </div>
+          <Btn onClick={()=>{setNewKm('');setKmModal(true);}} v="ghost" sz="sm">Actualizar</Btn>
+        </div>
+      </div>
+
+      <div style={{padding:'20px 16px'}}>
+        {/* Toggle vista Lista / Grilla */}
+        <div style={{display:'flex',justifyContent:'flex-end',marginBottom:14}}>
+          <div style={{display:'flex',background:'var(--bg-3)',borderRadius:'var(--radius-sm)',padding:3,gap:2}}>
+            {[['list','☰ Lista'],['grid','⊞ Grilla']].map(([id,label])=>(
+              <button key={id} onClick={()=>dispatch({type:'SET_DASH_VIEW',view:id})} style={{background:view===id?'var(--accent)':'transparent',color:view===id?'#fff':'var(--text-2)',border:'none',borderRadius:'var(--radius-sm)',padding:'5px 12px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'Sora,sans-serif',transition:'all .15s'}}>{label}</button>
+            ))}
+          </div>
+        </div>
+
+        <p style={{fontSize:12,fontWeight:700,color:'var(--text-3)',marginBottom:12,letterSpacing:'.08em',textTransform:'uppercase',paddingLeft:4}}>Controles mensuales</p>
+        <div style={{display:'grid',gridTemplateColumns:cols,gap:10,marginBottom:24}}>
+          {monthly.map(m=>isGrid?<CardGrid key={m.id} m={m}/>:<CardList key={m.id} m={m}/>)}
+        </div>
+        <p style={{fontSize:12,fontWeight:700,color:'var(--text-3)',marginBottom:12,letterSpacing:'.08em',textTransform:'uppercase',paddingLeft:4}}>Mantenimiento</p>
+        <div style={{display:'grid',gridTemplateColumns:cols,gap:10}}>
+          {service.map(m=>isGrid?<CardGrid key={m.id} m={m}/>:<CardList key={m.id} m={m}/>)}
+        </div>
+      </div>
+
+      {/* Modal KM */}
+      {kmModal&&(
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.75)',display:'flex',alignItems:'flex-end',zIndex:100}}>
+          <div style={{background:'var(--bg-2)',borderRadius:'var(--radius-xl) var(--radius-xl) 0 0',padding:'28px 24px 40px',width:'100%',border:'1px solid var(--border)'}}>
+            <h3 style={{fontSize:18,fontWeight:600,marginBottom:6}}>Actualizar kilometraje</h3>
+            <p style={{fontSize:13,color:'var(--text-2)',marginBottom:18}}>Actual: {Number(vehicle.km).toLocaleString('es-AR')} km</p>
+            <input type="number" value={newKm} onChange={e=>setNewKm(e.target.value)} placeholder="Nuevo kilometraje" style={{marginBottom:16}} autoFocus/>
+            <div style={{display:'flex',gap:10}}>
+              <Btn onClick={()=>setKmModal(false)} v="ghost" style={{flex:1,justifyContent:'center'}}>Cancelar</Btn>
+              <Btn onClick={()=>{if(Number(newKm)>0){dispatch({type:'UPD_KM',vid:vehicle.id,km:Number(newKm)});setKmModal(false);}}} disabled={!newKm||Number(newKm)<=0} style={{flex:1,justifyContent:'center'}}>Guardar</Btn>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal selector de vehículo */}
+      {vcModal&&(
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.75)',display:'flex',alignItems:'flex-end',zIndex:100}}>
+          <div style={{background:'var(--bg-2)',borderRadius:'var(--radius-xl) var(--radius-xl) 0 0',padding:'28px 24px 40px',width:'100%',border:'1px solid var(--border)'}}>
+            <h3 style={{fontSize:18,fontWeight:600,marginBottom:18}}>Cambiar vehículo</h3>
+            {vehicles.map(v=>{
+              const isCur=v.id===vehicle.id;
+              return (
+                <div key={v.id} onClick={()=>{ dispatch({type:'SET_FAV',id:v.id}); setVcModal(false); }} style={{background:isCur?'var(--accent-dim)':'var(--bg-3)',border:`1px solid ${isCur?'rgba(124,111,255,.35)':'var(--border)'}`,borderRadius:'var(--radius-lg)',padding:'14px 16px',marginBottom:10,cursor:'pointer',display:'flex',alignItems:'center',gap:12}}>
+                  <div style={{width:36,height:36,borderRadius:'50%',background:v.color||'#7C6FFF',border:'2px solid rgba(255,255,255,.15)',flexShrink:0}}/>
+                  <div style={{flex:1}}>
+                    <p style={{fontWeight:600,fontSize:14}}>{v.brand} {v.model}</p>
+                    <p style={{fontSize:11,color:'var(--text-3)',marginTop:2}}>{v.plate.toUpperCase()} · {Number(v.km).toLocaleString('es-AR')} km</p>
+                  </div>
+                  {isCur&&<span style={{color:'var(--accent)',fontSize:13,fontWeight:700}}>Activo</span>}
+                </div>
+              );
+            })}
+            <Btn onClick={()=>setVcModal(false)} v="ghost" style={{width:'100%',justifyContent:'center',marginTop:4}}>Cancelar</Btn>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── History ───────────────────────────────────────────────────────────
+const History = ({state, vehicle}) => {
+  const myHist = state.hist.filter(h=>h.vid===vehicle.id);
+  return (
+    <div style={{background:'var(--bg-0)',minHeight:'100vh',paddingBottom:80}}>
+      <div style={{background:'var(--bg-1)',borderBottom:'1px solid var(--border)',padding:'20px 20px 16px'}}>
+        <h1 style={{fontSize:20,fontWeight:700}}>Historial</h1>
+        <p style={{fontSize:13,color:'var(--text-2)',marginTop:4}}>{myHist.length} revisiones registradas</p>
+      </div>
+      <div style={{padding:'20px 16px'}}>
+        {myHist.length===0?(
+          <div style={{textAlign:'center',padding:'60px 20px'}}>
+            <div style={{fontSize:48,marginBottom:12}}>📋</div>
+            <p style={{fontSize:15,fontWeight:600,marginBottom:8}}>Sin registros aún</p>
+            <p style={{color:'var(--text-2)',fontSize:13}}>Cuando apliques una revisión, aparecerá acá</p>
+          </div>
+        ):(
+          <div style={{display:'flex',flexDirection:'column',gap:10}}>
+            {[...myHist].reverse().map((h,i)=>{
+              const m=vehicle.maints.find(x=>x.id===h.mid);
+              return (
+                <div key={i} style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-lg)',padding:'14px 16px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <div style={{display:'flex',gap:10,alignItems:'center'}}>
+                    <span style={{fontSize:20}}>{m?.icon}</span>
+                    <div>
+                      <p style={{fontWeight:600,fontSize:14}}>{m?.name}</p>
+                      <p style={{fontSize:11,color:'var(--text-3)',marginTop:2}}>{new Date(h.date).toLocaleDateString('es-AR',{day:'2-digit',month:'short',year:'numeric'})}</p>
+                    </div>
+                  </div>
+                  <p style={{fontFamily:'Space Mono',fontSize:13,fontWeight:700,color:'var(--text-2)'}}>{h.km.toLocaleString('es-AR')} km</p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ── Documents ─────────────────────────────────────────────────────────
+const Documents = ({state, dispatch}) => {
+  const [adding,setAdding]=useState(false);
+  const [f,setF]=useState({name:'',type:'VTV',date:''});
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  const types=['VTV','Seguro','Cédula','Factura','Otro'];
+  const icons={VTV:'📄',Seguro:'🛡️','Cédula':'🪪',Factura:'🧾',Otro:'📎'};
+  const addDoc=()=>{ if(!f.name)return; dispatch({type:'ADD_DOC',doc:{id:Date.now(),...f,addedAt:new Date().toISOString()}}); setF({name:'',type:'VTV',date:''}); setAdding(false); };
+  return (
+    <div style={{background:'var(--bg-0)',minHeight:'100vh',paddingBottom:80}}>
+      <div style={{background:'var(--bg-1)',borderBottom:'1px solid var(--border)',padding:'20px 20px 16px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div><h1 style={{fontSize:20,fontWeight:700}}>Documentación</h1><p style={{fontSize:13,color:'var(--text-2)',marginTop:4}}>Documentos del vehículo</p></div>
+        <Btn onClick={()=>setAdding(true)} sz="sm">+ Agregar</Btn>
+      </div>
+      <div style={{padding:'20px 16px'}}>
+        {adding&&(
+          <div style={{background:'var(--bg-2)',border:'1px solid var(--accent)',borderRadius:'var(--radius-xl)',padding:'20px 18px',marginBottom:20}}>
+            <h3 style={{fontSize:16,fontWeight:600,marginBottom:16}}>Nuevo documento</h3>
+            <div style={{marginBottom:12}}><label style={{fontSize:12,color:'var(--text-3)',display:'block',marginBottom:5}}>Tipo</label><select value={f.type} onChange={e=>set('type',e.target.value)}>{types.map(t=><option key={t}>{t}</option>)}</select></div>
+            <div style={{marginBottom:12}}><label style={{fontSize:12,color:'var(--text-3)',display:'block',marginBottom:5}}>Descripción</label><input value={f.name} onChange={e=>set('name',e.target.value)} placeholder="Ej: VTV 2025, Póliza Allianz..."/></div>
+            <div style={{marginBottom:18}}><label style={{fontSize:12,color:'var(--text-3)',display:'block',marginBottom:5}}>Fecha de vencimiento</label><input type="date" value={f.date} onChange={e=>set('date',e.target.value)}/></div>
+            <div style={{display:'flex',gap:10}}>
+              <Btn onClick={()=>setAdding(false)} v="ghost" style={{flex:1,justifyContent:'center'}}>Cancelar</Btn>
+              <Btn onClick={addDoc} disabled={!f.name} style={{flex:1,justifyContent:'center'}}>Guardar</Btn>
+            </div>
+          </div>
+        )}
+        {state.docs.length===0&&!adding?(
+          <div style={{textAlign:'center',padding:'60px 20px'}}>
+            <div style={{fontSize:48,marginBottom:12}}>📁</div>
+            <p style={{fontSize:15,fontWeight:600,marginBottom:8}}>Sin documentos</p>
+            <p style={{color:'var(--text-2)',fontSize:13,marginBottom:20}}>Guardá tu VTV, seguro, cédula y más</p>
+            <Btn onClick={()=>setAdding(true)}>Agregar documento</Btn>
+          </div>
+        ):(
+          <div style={{display:'flex',flexDirection:'column',gap:10}}>
+            {state.docs.map(doc=>{
+              const expired=doc.date&&new Date(doc.date)<new Date();
+              const near=doc.date&&!expired&&(new Date(doc.date)-new Date())<30*864e5;
+              return (
+                <div key={doc.id} style={{background:'var(--bg-2)',border:`1px solid ${expired?'rgba(255,85,85,.25)':near?'rgba(245,166,35,.25)':'var(--border)'}`,borderRadius:'var(--radius-lg)',padding:'14px 16px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <div style={{display:'flex',gap:12,alignItems:'center'}}>
+                    <span style={{fontSize:24}}>{icons[doc.type]}</span>
+                    <div>
+                      <p style={{fontWeight:600,fontSize:14}}>{doc.name}</p>
+                      <p style={{fontSize:11,color:'var(--text-3)',marginTop:2}}>{doc.type}{doc.date&&` · Vence ${new Date(doc.date).toLocaleDateString('es-AR')}`}</p>
+                      {expired&&<span style={{fontSize:11,color:'var(--red)',fontWeight:700}}>⚠ Vencido</span>}
+                      {near&&!expired&&<span style={{fontSize:11,color:'var(--amber)',fontWeight:700}}>⚠ Vence pronto</span>}
+                    </div>
+                  </div>
+                  <button onClick={()=>dispatch({type:'DEL_DOC',id:doc.id})} style={{background:'none',border:'none',color:'var(--text-3)',cursor:'pointer',fontSize:20,padding:4,lineHeight:1}}>×</button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ── Workshop ──────────────────────────────────────────────────────────
+const Workshop = ({state, dispatch, vehicle}) => {
+  const [mode,  setMode]  = useState('list');
+  const [selId, setSelId] = useState(null);
+  // Solo mostrar entradas del vehículo activo (o sin vid para retrocompatibilidad)
+  const ws = (state.workshop || []).filter(w => !w.vid || w.vid === vehicle.id);
+  const fmt = v => isNaN(Number(v)) ? v : `$${Number(v).toLocaleString('es-AR')}`;
+
+  if (mode==='add') return (
+    <div style={{background:'var(--bg-0)',minHeight:'100vh',paddingBottom:90}}>
+      <div style={{background:'var(--bg-1)',borderBottom:'1px solid var(--border)',padding:'16px 20px',display:'flex',alignItems:'center',gap:12,position:'sticky',top:0,zIndex:10}}>
+        <button onClick={()=>setMode('list')} style={{background:'none',border:'none',color:'var(--text-2)',cursor:'pointer',fontSize:22,padding:'0 4px',lineHeight:1}}>←</button>
+        <div>
+          <h2 style={{fontSize:17,fontWeight:600}}>Nueva visita</h2>
+          <p style={{fontSize:11,color:'var(--text-3)',marginTop:1}}>{vehicle.brand} {vehicle.model}</p>
+        </div>
+      </div>
+      <div style={{padding:'20px 16px'}}>
+        <WorkshopForm title="Nueva visita al taller" onCancel={()=>setMode('list')}
+          onSave={f=>{ dispatch({type:'ADD_WORK',entry:{id:Date.now(),...f,vid:vehicle.id,createdAt:new Date().toISOString()}}); setMode('list'); }}/>
+      </div>
+    </div>
+  );
+
+  if (mode==='edit') {
+    const e=ws.find(w=>w.id===selId);
+    if (!e) { setMode('list'); return null; }
+    return (
+      <div style={{background:'var(--bg-0)',minHeight:'100vh',paddingBottom:90}}>
+        <div style={{background:'var(--bg-1)',borderBottom:'1px solid var(--border)',padding:'16px 20px',display:'flex',alignItems:'center',gap:12,position:'sticky',top:0,zIndex:10}}>
+          <button onClick={()=>setMode('detail')} style={{background:'none',border:'none',color:'var(--text-2)',cursor:'pointer',fontSize:22,padding:'0 4px',lineHeight:1}}>←</button>
+          <h2 style={{fontSize:17,fontWeight:600}}>Editar visita</h2>
+        </div>
+        <div style={{padding:'20px 16px'}}>
+          <WorkshopForm key={e.id} title="Editar visita" initial={e} onCancel={()=>setMode('detail')}
+            onSave={f=>{ dispatch({type:'UPD_WORK',entry:{...e,...f}}); setMode('detail'); }}/>
+        </div>
+      </div>
+    );
+  }
+
+  if (mode==='detail') {
+    const e=ws.find(w=>w.id===selId);
+    if (!e) { setMode('list'); return null; }
+    return (
+      <div style={{minHeight:'100vh',background:'var(--bg-0)',paddingBottom:90}}>
+        <div style={{background:'var(--bg-1)',borderBottom:'1px solid var(--border)',padding:'16px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:10}}>
+          <div style={{display:'flex',alignItems:'center',gap:12}}>
+            <button onClick={()=>setMode('list')} style={{background:'none',border:'none',color:'var(--text-2)',cursor:'pointer',fontSize:22,padding:'0 4px',lineHeight:1}}>←</button>
+            <h2 style={{fontSize:17,fontWeight:600}}>Visita al taller</h2>
+          </div>
+          <div style={{display:'flex',gap:8}}>
+            <button onClick={()=>setMode('edit')} style={{background:'var(--bg-3)',border:'1px solid var(--border)',color:'var(--text-2)',borderRadius:'var(--radius-sm)',padding:'6px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'Sora,sans-serif'}}>✏ Editar</button>
+            <button onClick={()=>{ dispatch({type:'DEL_WORK',id:e.id}); setMode('list'); }} style={{background:'var(--red-dim)',border:'1px solid rgba(255,85,85,.2)',color:'var(--red)',borderRadius:'var(--radius-sm)',padding:'6px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'Sora,sans-serif'}}>Eliminar</button>
+          </div>
+        </div>
+        <div style={{padding:'24px 20px'}}>
+          {/* Lugar, fecha y contacto */}
+          <div style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-xl)',padding:'20px',marginBottom:16}}>
+            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:16}}>
+              <div style={{width:44,height:44,background:'var(--accent-dim)',border:'1px solid rgba(124,111,255,.25)',borderRadius:'var(--radius-md)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,flexShrink:0}}>🔩</div>
+              <div>
+                <p style={{fontWeight:700,fontSize:16}}>{e.place}</p>
+                <p style={{fontSize:13,color:'var(--text-2)',marginTop:2}}>{new Date(e.date+'T12:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'long',year:'numeric'})}</p>
+              </div>
+            </div>
+            {(e.person||e.phone)&&(
+              <div style={{borderTop:'1px solid var(--border)',paddingTop:14}}>
+                <p style={{fontSize:11,color:'var(--text-3)',marginBottom:8,fontWeight:600,letterSpacing:'.05em',textTransform:'uppercase'}}>Contacto</p>
+                {e.person&&<div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}><span style={{fontSize:16}}>👤</span><span style={{fontSize:14,fontWeight:500}}>{e.person}</span></div>}
+                {e.phone&&<div style={{display:'flex',alignItems:'center',gap:8}}><span style={{fontSize:16}}>📞</span><a href={`tel:${e.phone}`} style={{fontSize:14,color:'var(--blue)',fontFamily:'Space Mono',textDecoration:'none',fontWeight:600}}>{e.phone}</a></div>}
+              </div>
+            )}
+          </div>
+
+          {/* Descripción */}
+          <div style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-xl)',padding:'20px',marginBottom:16}}>
+            <p style={{fontSize:11,color:'var(--text-3)',marginBottom:8,fontWeight:600,letterSpacing:'.05em',textTransform:'uppercase'}}>Trabajo realizado</p>
+            <p style={{fontSize:14,color:'var(--text-1)',lineHeight:1.6}}>{e.description}</p>
+          </div>
+
+          {/* Marcas/Productos — nueva sección */}
+          {e.products&&(
+            <div style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-xl)',padding:'20px',marginBottom:16}}>
+              <p style={{fontSize:11,color:'var(--text-3)',marginBottom:10,fontWeight:600,letterSpacing:'.05em',textTransform:'uppercase'}}>Marcas / Productos utilizados</p>
+              <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+                {e.products.split(',').map((p,i)=>(
+                  <span key={i} style={{background:'var(--bg-3)',border:'1px solid var(--border)',borderRadius:99,padding:'4px 12px',fontSize:12,color:'var(--text-2)',fontWeight:500}}>{p.trim()}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Resultado */}
+          {e.result&&<div style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-xl)',padding:'20px',marginBottom:16}}><p style={{fontSize:11,color:'var(--text-3)',marginBottom:8,fontWeight:600,letterSpacing:'.05em',textTransform:'uppercase'}}>Resultado / Observaciones</p><p style={{fontSize:14,color:'var(--text-1)',lineHeight:1.6}}>{e.result}</p></div>}
+
+          {/* Costo */}
+          {e.cost&&<div style={{background:'var(--green-dim)',border:'1px solid rgba(46,232,154,.15)',borderRadius:'var(--radius-xl)',padding:'20px'}}><p style={{fontSize:11,color:'rgba(46,232,154,.6)',marginBottom:6,fontWeight:600,letterSpacing:'.05em',textTransform:'uppercase'}}>Costo total</p><p style={{fontFamily:'Space Mono',fontSize:26,fontWeight:700,color:'var(--green)'}}>{fmt(e.cost)}</p></div>}
+        </div>
+      </div>
+    );
+  }
+
+  // Lista
+  return (
+    <div style={{background:'var(--bg-0)',minHeight:'100vh',paddingBottom:80}}>
+      <div style={{background:'var(--bg-1)',borderBottom:'1px solid var(--border)',padding:'20px 20px 16px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div>
+          <h1 style={{fontSize:20,fontWeight:700}}>Taller</h1>
+          <p style={{fontSize:13,color:'var(--text-2)',marginTop:4}}>{vehicle.brand} {vehicle.model}</p>
+        </div>
+        <Btn onClick={()=>setMode('add')} sz="sm">+ Agregar</Btn>
+      </div>
+      <div style={{padding:'20px 16px'}}>
+        {ws.length===0?(
+          <div style={{textAlign:'center',padding:'60px 20px'}}>
+            <div style={{fontSize:48,marginBottom:12}}>🔧</div>
+            <p style={{fontSize:15,fontWeight:600,marginBottom:8}}>Sin visitas registradas</p>
+            <p style={{color:'var(--text-2)',fontSize:13,marginBottom:20}}>Registrá cada visita con el mecánico, trabajos y costos</p>
+            <Btn onClick={()=>setMode('add')}>Registrar primera visita</Btn>
+          </div>
+        ):(
+          <div style={{display:'flex',flexDirection:'column',gap:12}}>
+            {[...ws].reverse().map(e=>(
+              <div key={e.id} onClick={()=>{ setSelId(e.id); setMode('detail'); }} style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-lg)',padding:'16px',cursor:'pointer',transition:'all .15s'}} onMouseOver={ev=>{ev.currentTarget.style.background='var(--bg-3)';ev.currentTarget.style.borderColor='var(--border-hover)';}} onMouseOut={ev=>{ev.currentTarget.style.background='var(--bg-2)';ev.currentTarget.style.borderColor='var(--border)';}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
+                  <div style={{display:'flex',gap:12,alignItems:'center'}}>
+                    <div style={{width:40,height:40,background:'var(--accent-dim)',border:'1px solid rgba(124,111,255,.2)',borderRadius:'var(--radius-md)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0}}>🔩</div>
+                    <div>
+                      <p style={{fontWeight:700,fontSize:14}}>{e.place}</p>
+                      <p style={{fontSize:11,color:'var(--text-3)',marginTop:2}}>{new Date(e.date+'T12:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'short',year:'numeric'})}{e.person&&` · ${e.person}`}</p>
+                    </div>
+                  </div>
+                  {e.cost&&<span style={{fontFamily:'Space Mono',fontSize:13,fontWeight:700,color:'var(--green)',background:'var(--green-dim)',padding:'3px 8px',borderRadius:6,whiteSpace:'nowrap'}}>{fmt(e.cost)}</span>}
+                </div>
+                <p style={{fontSize:13,color:'var(--text-2)',lineHeight:1.5,overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>{e.description}</p>
+                {e.products&&(
+                  <p style={{fontSize:11,color:'var(--text-3)',marginTop:6}}>
+                    🏷 {e.products.split(',').slice(0,3).map(p=>p.trim()).join(' · ')}
+                  </p>
+                )}
+                {e.phone&&<p style={{fontSize:11,color:'var(--blue)',marginTop:6}}>📞 {e.phone}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ── FAQ Screen ────────────────────────────────────────────────────────
+const FAQ_ITEMS = [
+  { q:'¿Cómo funciona AutoCare?', a:'AutoCare es un historial clínico para tu vehículo. Registrás tu auto, cargás los mantenimientos a medida que los hacés, y la app te muestra el estado de cada uno con barras de salud y alertas de color.' },
+  { q:'¿Qué significa la barra de porcentaje?', a:'La barra muestra la salud restante del ítem. 100% = recién revisado. A medida que pasan kilómetros o días, baja. Cuando llega a 0% o cambia a rojo, es hora de atenderlo.' },
+  { q:'¿Cómo registro una revisión?', a:'Entrá al ítem desde el dashboard, elegí la fecha (puede ser una pasada si te olvidaste de cargarla) y el kilometraje al momento, y tocá "Confirmar revisión". El estado se actualiza automáticamente.' },
+  { q:'¿Puedo agregar más de un vehículo?', a:'Sí. Desde el Perfil podés agregar tantos autos como quieras. El que marqués como favorito (⭐) es el que aparece en el dashboard por defecto. Podés cambiar entre ellos desde el mismo dashboard.' },
+  { q:'¿Qué es la sección Taller?', a:'El Taller es un registro de visitas a mecánicos o talleres. Podés anotar la fecha, el lugar, el mecánico, los trabajos realizados, los resultados y el costo. Es útil para tener un historial completo del auto.' },
+  { q:'¿Cómo funciona "Controles mensuales" vs "Mantenimiento"?', a:'Los controles mensuales son revisiones periódicas simples (como cubiertas y refrigerante). El mantenimiento incluye tareas más técnicas con intervalos por km o tiempo. Podés mover cualquier ítem entre las dos secciones según tu preferencia.' },
+  { q:'¿Puedo personalizar los intervalos de cada ítem?', a:'Sí. Desde Perfil → Personalizar intervalos podés cambiar cada cuántos km o días te avisa cada ítem. Aparece el valor por defecto como referencia.' },
+  { q:'¿Los datos se guardan si cierro la app?', a:'Sí. Todo se guarda automáticamente en el dispositivo. No necesitás crear cuenta con servidor — los datos persisten entre sesiones.' },
+  { q:'¿Qué pasa si registro un km mayor al actual del auto?', a:'AutoCare te muestra una advertencia y te ofrece actualizar el odómetro del vehículo con un solo toque, sin que tengas que hacerlo por separado.' },
+  { q:'¿Puedo registrar una revisión con fecha pasada?', a:'Sí. En la pantalla de detalle de cada ítem podés elegir cualquier fecha anterior a hoy. La app muestra cuántos días atrás fue y calcula el estado correctamente desde esa fecha.' },
+];
+
+const FAQScreen = ({onBack}) => {
+  const [open, setOpen] = useState(null);
+  return (
+    <div style={{minHeight:'100vh',background:'var(--bg-0)',paddingBottom:90}}>
+      <div style={{background:'var(--bg-1)',borderBottom:'1px solid var(--border)',padding:'16px 20px',display:'flex',alignItems:'center',gap:12,position:'sticky',top:0,zIndex:10}}>
+        <button onClick={onBack} style={{background:'none',border:'none',color:'var(--text-2)',cursor:'pointer',fontSize:22,padding:'0 4px',lineHeight:1}}>←</button>
+        <div>
+          <h2 style={{fontSize:17,fontWeight:600}}>Preguntas frecuentes</h2>
+          <p style={{fontSize:11,color:'var(--text-3)',marginTop:1}}>Cómo usar AutoCare</p>
+        </div>
+      </div>
+      <div style={{padding:'20px 16px'}}>
+        <div style={{background:'var(--accent-dim)',border:'1px solid rgba(124,111,255,.2)',borderRadius:'var(--radius-lg)',padding:'14px 16px',marginBottom:20,display:'flex',gap:10,alignItems:'flex-start'}}>
+          <span style={{fontSize:20,flexShrink:0}}>🚗</span>
+          <p style={{fontSize:13,color:'rgba(200,195,255,.9)',lineHeight:1.5}}>AutoCare es tu historial clínico de vehículo. Registrá mantenimientos, visitás al taller y llevá el control de todo en un solo lugar.</p>
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          {FAQ_ITEMS.map((item,i)=>(
+            <div key={i} style={{background:'var(--bg-2)',border:`1px solid ${open===i?'rgba(124,111,255,.3)':'var(--border)'}`,borderRadius:'var(--radius-lg)',overflow:'hidden',transition:'border-color .2s'}}>
+              <button onClick={()=>setOpen(open===i?null:i)} style={{width:'100%',background:'none',border:'none',padding:'14px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer',gap:12}}>
+                <span style={{fontSize:13,fontWeight:600,color:'var(--text-1)',textAlign:'left',lineHeight:1.3}}>{item.q}</span>
+                <span style={{fontSize:16,color:'var(--text-3)',flexShrink:0,transition:'transform .2s',transform:open===i?'rotate(180deg)':'rotate(0deg)'}}>⌄</span>
+              </button>
+              {open===i&&(
+                <div style={{padding:'0 16px 16px'}}>
+                  <p style={{fontSize:13,color:'var(--text-2)',lineHeight:1.6}}>{item.a}</p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── IntervalsScreen ───────────────────────────────────────────────────
+const IntervalsScreen = ({vehicle, dispatch, onBack}) => {
+  const [editId, setEditId] = useState(null);
+
+  const MaintRow = ({m}) => {
+    const isEditing = editId===m.id;
+    const def = MAINTS_DEFAULT.find(x=>x.id===m.id);
+    const isCustom = def && (m.iKm!==def.iKm || m.iDays!==def.iDays || m.trigger!==def.trigger);
+    const [iKm,  setIKm]  = useState(m.iKm!=null?String(m.iKm):'');
+    const [iDays,setIDays]= useState(m.iDays!=null?String(m.iDays):'');
+    const [trig, setTrig] = useState(m.trigger);
+    const save=()=>{ dispatch({type:'UPD_MAINT_INTERVAL',vid:vehicle.id,mid:m.id,changes:{iKm:iKm?Number(iKm):null,iDays:iDays?Number(iDays):null,trigger:trig}}); setEditId(null); };
+    return (
+      <div style={{background:'var(--bg-2)',border:`1px solid ${isEditing?'rgba(124,111,255,.3)':'var(--border)'}`,borderRadius:'var(--radius-lg)',marginBottom:10,overflow:'hidden'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            <span style={{fontSize:20}}>{m.icon}</span>
+            <div>
+              <div style={{display:'flex',alignItems:'center',gap:6}}>
+                <span style={{fontSize:13,fontWeight:600}}>{m.name}</span>
+                {isCustom&&<span style={{fontSize:9,background:'var(--accent-dim)',color:'var(--accent)',padding:'1px 6px',borderRadius:99,fontWeight:700,letterSpacing:'.04em'}}>CUSTOM</span>}
+              </div>
+              <p style={{fontSize:11,color:'var(--text-3)',marginTop:2}}>
+                {m.iKm?`${m.iKm.toLocaleString('es-AR')} km`:''}{m.iKm&&m.iDays?' · ':''}{m.iDays?`${m.iDays} días`:''}
+                {!m.iKm&&!m.iDays&&'Sin intervalo'}
+              </p>
+            </div>
+          </div>
+          <button onClick={()=>setEditId(isEditing?null:m.id)} style={{background:isEditing?'var(--accent)':'var(--bg-3)',border:'none',borderRadius:'var(--radius-sm)',color:isEditing?'#fff':'var(--text-2)',fontSize:11,fontWeight:600,cursor:'pointer',padding:'5px 12px',fontFamily:'Sora,sans-serif',transition:'all .2s'}}>
+            {isEditing?'✕':'Editar'}
+          </button>
+        </div>
+        {isEditing&&(
+          <div style={{padding:'0 16px 16px',borderTop:'1px solid var(--border)'}}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12,marginTop:12}}>
+              <div>
+                <label style={{fontSize:11,color:'var(--text-3)',display:'block',marginBottom:4}}>Cada N km</label>
+                <input type="number" value={iKm} onChange={e=>setIKm(e.target.value)} placeholder={def?.iKm?String(def.iKm):'No aplica'}/>
+              </div>
+              <div>
+                <label style={{fontSize:11,color:'var(--text-3)',display:'block',marginBottom:4}}>Cada N días</label>
+                <input type="number" value={iDays} onChange={e=>setIDays(e.target.value)} placeholder={def?.iDays?String(def.iDays):'No aplica'}/>
+              </div>
+            </div>
+            <div style={{marginBottom:12}}>
+              <label style={{fontSize:11,color:'var(--text-3)',display:'block',marginBottom:6}}>Disparador de alerta</label>
+              <div style={{display:'flex',gap:6}}>
+                {[['both','El primero'],['km','Solo KM'],['time','Solo días']].map(([val,lbl])=>(
+                  <button key={val} onClick={()=>setTrig(val)} style={{flex:1,padding:'7px 4px',fontSize:11,fontWeight:600,fontFamily:'Sora,sans-serif',borderRadius:'var(--radius-sm)',border:'none',cursor:'pointer',background:trig===val?'var(--accent)':'var(--bg-3)',color:trig===val?'#fff':'var(--text-2)',transition:'all .15s'}}>{lbl}</button>
+                ))}
+              </div>
+            </div>
+            {def&&<p style={{fontSize:11,color:'var(--text-3)',marginBottom:12}}>Por defecto: {def.iKm?`${def.iKm.toLocaleString('es-AR')} km`:''}{def.iKm&&def.iDays?' / ':''}{def.iDays?`${def.iDays} días`:''}</p>}
+            <div style={{display:'flex',gap:8}}>
+              <Btn onClick={()=>setEditId(null)} v="ghost" style={{flex:1,justifyContent:'center'}} sz="sm">Cancelar</Btn>
+              <Btn onClick={save} style={{flex:1,justifyContent:'center'}} sz="sm">Guardar cambios</Btn>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div style={{minHeight:'100vh',background:'var(--bg-0)',paddingBottom:90}}>
+      <div style={{background:'var(--bg-1)',borderBottom:'1px solid var(--border)',padding:'16px 20px',display:'flex',alignItems:'center',gap:12,position:'sticky',top:0,zIndex:10}}>
+        <button onClick={onBack} style={{background:'none',border:'none',color:'var(--text-2)',cursor:'pointer',fontSize:22,padding:'0 4px',lineHeight:1}}>←</button>
+        <div>
+          <h2 style={{fontSize:17,fontWeight:600}}>Personalizar intervalos</h2>
+          <p style={{fontSize:11,color:'var(--text-3)',marginTop:1}}>{vehicle.brand} {vehicle.model}</p>
+        </div>
+      </div>
+      <div style={{padding:'20px 16px'}}>
+        <div style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-lg)',padding:'12px 14px',marginBottom:20}}>
+          <p style={{fontSize:12,color:'var(--text-2)',lineHeight:1.5}}>Modificá cuándo querés que AutoCare te avise para cada ítem. Los valores marcados como <span style={{color:'var(--accent)',fontWeight:700}}>CUSTOM</span> son los que cambiaste.</p>
+        </div>
+        {vehicle.maints.map(m=><MaintRow key={m.id} m={m}/>)}
+      </div>
+    </div>
+  );
+};
+
+// ── VehicleDetailScreen ───────────────────────────────────────────────
+const VehicleDetailScreen = ({vehicle, isFav, dispatch, onBack, onGoToDashboard}) => {
+  const [km, setKm] = useState('');
+  const ov = overallStatus(vehicle.maints, vehicle.km);
+  const done = vehicle.maints.filter(m=>m.lastDate).length;
+  const carColor = vehicle.color || '#7C6FFF';
+  return (
+    <div style={{minHeight:'100vh',background:'var(--bg-0)',paddingBottom:90}}>
+      <div style={{background:'var(--bg-1)',borderBottom:'1px solid var(--border)',padding:'16px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:10}}>
+        <div style={{display:'flex',alignItems:'center',gap:12}}>
+          <button onClick={onBack} style={{background:'none',border:'none',color:'var(--text-2)',cursor:'pointer',fontSize:22,padding:'0 4px',lineHeight:1}}>←</button>
+          <h2 style={{fontSize:17,fontWeight:600}}>{vehicle.brand} {vehicle.model}</h2>
+        </div>
+        {isFav?<span style={{fontSize:18}}>⭐</span>:<button onClick={()=>dispatch({type:'SET_FAV',id:vehicle.id})} style={{background:'var(--bg-3)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',color:'var(--text-2)',fontSize:12,fontWeight:600,padding:'5px 10px',cursor:'pointer',fontFamily:'Sora,sans-serif'}}>☆ Marcar favorito</button>}
+      </div>
+      <div style={{padding:'24px 20px'}}>
+        <div style={{display:'flex',justifyContent:'center',marginBottom:20}}><CarSVG c={carColor}/></div>
+        <div style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-xl)',padding:'20px',marginBottom:16}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+            <h3 style={{fontSize:15,fontWeight:600}}>Datos del vehículo</h3>
+            <Badge color={ov.color} label={ov.label}/>
+          </div>
+          {[['Marca / Modelo',`${vehicle.brand} ${vehicle.model}`,false],['Año',vehicle.year,false],['Patente',vehicle.plate.toUpperCase(),true],['Kilometraje',`${Number(vehicle.km).toLocaleString('es-AR')} km`,true],['Color',CAR_COLORS.find(c=>c.hex===vehicle.color)?.name||vehicle.color||'—',false]].map(([l,v,mono])=>(
+            <div key={l} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
+              <span style={{fontSize:13,color:'var(--text-3)'}}>{l}</span>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                {l==='Color'&&vehicle.color&&<div style={{width:14,height:14,borderRadius:'50%',background:vehicle.color,border:'1px solid rgba(255,255,255,.2)'}}/>}
+                <span style={{fontSize:13,fontWeight:700,fontFamily:mono?'Space Mono':'Sora'}}>{v}</span>
+              </div>
+            </div>
+          ))}
+          <div style={{marginTop:12}}>
+            <p style={{fontSize:11,color:'var(--text-3)',marginBottom:4}}>Revisiones completadas</p>
+            <p style={{fontFamily:'Space Mono',fontSize:22,fontWeight:700}}>{done}<span style={{fontSize:13,color:'var(--text-3)',fontFamily:'Sora'}}>/{vehicle.maints.length}</span></p>
+          </div>
+        </div>
+        <div style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-xl)',padding:'20px',marginBottom:16}}>
+          <h3 style={{fontSize:14,fontWeight:600,marginBottom:12}}>Actualizar kilometraje</h3>
+          <div style={{display:'flex',gap:10}}>
+            <input type="number" value={km} onChange={e=>setKm(e.target.value)} placeholder={`Actual: ${Number(vehicle.km).toLocaleString('es-AR')} km`} style={{flex:1}}/>
+            <Btn onClick={()=>{if(Number(km)>0){dispatch({type:'UPD_KM',vid:vehicle.id,km:Number(km)});setKm('');}}} disabled={!km||Number(km)<=0}>OK</Btn>
+          </div>
+        </div>
+        <Btn onClick={()=>{ dispatch({type:'SET_FAV',id:vehicle.id}); onGoToDashboard(); }} style={{width:'100%',justifyContent:'center'}} sz="lg">
+          {isFav?'Ver en dashboard →':'Ir al dashboard con este auto →'}
+        </Btn>
+      </div>
+    </div>
+  );
+};
+
+// ── Profile ───────────────────────────────────────────────────────────
+const Profile = ({state, dispatch, onLogout, onAddVehicle, onNav}) => {
+  const {user,vehicles,favoriteVehicleId}=state;
+  const [subScreen, setSubScreen] = useState(null); // null | 'intervals' | 'faq' | {type:'vehicle', id}
+
+  const favV=vehicles.find(v=>v.id===favoriteVehicleId)||vehicles[0];
+
+  if (subScreen==='faq') return <FAQScreen onBack={()=>setSubScreen(null)}/>;
+  if (subScreen==='intervals') return <IntervalsScreen vehicle={favV} dispatch={dispatch} onBack={()=>setSubScreen(null)}/>;
+  if (subScreen?.type==='vehicle') {
+    const v = vehicles.find(x=>x.id===subScreen.id);
+    if (!v) { setSubScreen(null); return null; }
+    return <VehicleDetailScreen vehicle={v} isFav={v.id===favoriteVehicleId} dispatch={dispatch}
+      onBack={()=>setSubScreen(null)}
+      onGoToDashboard={()=>{ setSubScreen(null); onNav('home'); }}
+    />;
+  }
+
+  const ProfileRow = ({icon, label, sub, onPress, accent=false}) => (
+    <div onClick={onPress} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'13px 0',borderBottom:'1px solid var(--border)',cursor:'pointer'}}>
+      <div style={{display:'flex',alignItems:'center',gap:12}}>
+        <span style={{fontSize:20,width:28,textAlign:'center'}}>{icon}</span>
+        <div>
+          <p style={{fontSize:14,fontWeight:500,color:accent?'var(--accent)':'var(--text-1)'}}>{label}</p>
+          {sub&&<p style={{fontSize:11,color:'var(--text-3)',marginTop:2}}>{sub}</p>}
+        </div>
+      </div>
+      <span style={{color:'var(--text-3)',fontSize:16}}>›</span>
+    </div>
+  );
+
+  return (
+    <div style={{background:'var(--bg-0)',minHeight:'100vh',paddingBottom:80}}>
+      <div style={{background:'var(--bg-1)',borderBottom:'1px solid var(--border)',padding:'20px 20px 16px'}}>
+        <h1 style={{fontSize:20,fontWeight:700}}>Perfil</h1>
+      </div>
+      <div style={{padding:'20px 16px'}}>
+        {/* Usuario */}
+        <div style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-xl)',padding:'24px 20px',marginBottom:16,textAlign:'center'}}>
+          <div style={{width:64,height:64,borderRadius:'50%',background:'var(--accent-dim)',border:'2px solid var(--accent)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 12px',fontSize:26}}>👤</div>
+          <h2 style={{fontSize:18,fontWeight:700}}>{user.name}</h2>
+          <p style={{fontSize:13,color:'var(--text-2)',marginTop:4}}>{user.email}</p>
+        </div>
+
+        {/* Mis vehículos — cliqueables */}
+        <div style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-xl)',padding:'20px',marginBottom:16}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+            <h3 style={{fontSize:15,fontWeight:600}}>Mis vehículos</h3>
+            <Btn onClick={onAddVehicle} sz="sm">+ Agregar</Btn>
+          </div>
+          {vehicles.map(v=>{
+            const isFav=v.id===favoriteVehicleId;
+            const vov=overallStatus(v.maints,v.km);
+            return (
+              <div key={v.id} onClick={()=>setSubScreen({type:'vehicle',id:v.id})}
+                style={{background:'var(--bg-3)',border:`1px solid ${isFav?'rgba(124,111,255,.35)':'var(--border)'}`,borderRadius:'var(--radius-lg)',padding:'14px 16px',marginBottom:10,display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer',transition:'all .15s'}}
+                onMouseOver={e=>{e.currentTarget.style.background='var(--bg-4)';}}
+                onMouseOut={e=>{e.currentTarget.style.background='var(--bg-3)';}}>
+                <div style={{display:'flex',alignItems:'center',gap:12}}>
+                  <div style={{width:36,height:36,borderRadius:'50%',background:v.color||'#7C6FFF',border:'2px solid rgba(255,255,255,.15)',boxShadow:`0 0 8px ${v.color||'#7C6FFF'}50`,flexShrink:0}}/>
+                  <div>
+                    <p style={{fontWeight:600,fontSize:14}}>{v.brand} {v.model}</p>
+                    <p style={{fontSize:11,color:'var(--text-3)',marginTop:2}}><span style={{fontFamily:'Space Mono'}}>{v.plate.toUpperCase()}</span> · {Number(v.km).toLocaleString('es-AR')} km</p>
+                  </div>
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <Badge color={vov.color} label={vov.label}/>
+                  {isFav?<span style={{fontSize:16}}>⭐</span>:<span style={{fontSize:16,color:'var(--text-3)'}}>›</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Opciones de configuración */}
+        <div style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-xl)',padding:'4px 20px',marginBottom:16}}>
+          <ProfileRow icon="⚙️" label="Personalizar intervalos" sub={favV?`${favV.brand} ${favV.model}`:'Configurar alertas'} onPress={()=>setSubScreen('intervals')}/>
+          <ProfileRow icon="❓" label="Preguntas frecuentes" sub="Cómo usar AutoCare" onPress={()=>setSubScreen('faq')}/>
+        </div>
+
+        <Btn onClick={onLogout} v="danger" style={{width:'100%',justifyContent:'center'}} sz="lg">Cerrar sesión</Btn>
+      </div>
+    </div>
+  );
+};
+
+// ── Nav ───────────────────────────────────────────────────────────────
+const Nav = ({active,onNav}) => {
+  const items = [
+    { id:'home',     iconId:'home',   l:'Inicio' },
+    { id:'workshop', iconId:'wrench', l:'Taller' },
+    { id:'history',  iconId:'hist',   l:'Historial' },
+    { id:'docs',     iconId:'folder', l:'Docs' },
+    { id:'profile',  iconId:'user',   l:'Perfil' },
+  ];
+  return (
+    <div style={{position:'fixed',bottom:0,left:0,right:0,background:'rgba(11,17,12,0.96)',borderTop:'1px solid var(--border)',display:'flex',zIndex:50,backdropFilter:'blur(12px)'}}>
+      {items.map(it=>(
+        <button key={it.id} onClick={()=>onNav(it.id)} style={{flex:1,background:'none',border:'none',cursor:'pointer',padding:'10px 4px 12px',display:'flex',flexDirection:'column',alignItems:'center',gap:3}}>
+          <Icon id={it.iconId} size={20} color={active===it.id?'var(--green)':'var(--text-3)'}/>
+          <span style={{fontSize:10,color:active===it.id?'var(--green)':'var(--text-3)',fontFamily:'DM Sans',fontWeight:active===it.id?700:400}}>{it.l}</span>
+          {active===it.id&&<div style={{width:20,height:2,background:'var(--green)',borderRadius:99}}/>}
+        </button>
+      ))}
+    </div>
+  );
+};
+
+// ── App ───────────────────────────────────────────────────────────────
+const App = () => {
+  const [state,   dispatch]  = useReducer(reducer, null, ()=>load()||initState());
+  const [screen,  setScreen] = useState('home');
+  const [addingV, setAddingV]= useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+  useEffect(()=>save(state),[state]);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({data:{session}}) => {
+      if (session?.user) dispatch({type:'LOGIN', user:sessionToUser(session.user)});
+      setAuthChecked(true);
+    });
+    const { data:sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) dispatch({type:'LOGIN', user:sessionToUser(session.user)});
+      else dispatch({type:'RESET'});
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  const logout=()=>{ supabase.auth.signOut(); dispatch({type:'RESET'}); setScreen('home'); setAddingV(false); };
+
+  if (!authChecked) return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--bg-0)'}}><Icon id="car" size={32} color="var(--green)"/></div>;
+  if (!state.user) return <Login onLogin={u=>dispatch({type:'LOGIN',user:u})}/>;
+  if (state.vehicles.length===0&&!addingV)
+    return <VehicleForm title="Configuración inicial" subtitle={`Hola ${state.user.name} 👋 Configuremos el historial de tu auto.`}
+      onComplete={v=>dispatch({type:'ADD_VEH',v})}/>;
+  if (addingV)
+    return <VehicleForm onCancel={()=>setAddingV(false)} title="Agregar vehículo"
+      onComplete={v=>{ dispatch({type:'ADD_VEH',v}); setAddingV(false); setScreen('profile'); }}/>;
+
+  const favVehicle = state.vehicles.find(v=>v.id===state.favoriteVehicleId)||state.vehicles[0];
+
+  return (
+    <div style={{maxWidth:480,margin:'0 auto',position:'relative'}}>
+      {screen==='home'     && <Dashboard state={state} dispatch={dispatch} vehicle={favVehicle} vehicles={state.vehicles} onNav={setScreen}/>}
+      {screen==='workshop' && <Workshop  state={state} dispatch={dispatch} vehicle={favVehicle}/>}
+      {screen==='history'  && <History   state={state} vehicle={favVehicle}/>}
+      {screen==='docs'     && <Documents state={state} dispatch={dispatch}/>}
+      {screen==='profile'  && <Profile   state={state} dispatch={dispatch} onLogout={logout} onAddVehicle={()=>setAddingV(true)} onNav={setScreen}/>}
+      <Nav active={screen} onNav={setScreen}/>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
