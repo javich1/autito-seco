@@ -59,12 +59,35 @@ const load = () => { try { return JSON.parse(localStorage.getItem(STORE_KEY)); }
 const save = d => localStorage.setItem(STORE_KEY, JSON.stringify(d));
 const todayStr = () => new Date().toISOString().slice(0,10);
 
-// ── Supabase Auth (solo login; autos/mantenimientos siguen en localStorage) ──
+// ── Supabase: Auth + datos en la nube (vehicles/history/workshop_entries/documents) ──
 const supabase = window.supabase.createClient(
   'https://iiggstwvqbnhpfndgdol.supabase.co',
-  'sb_publishable_zfRqJm0TvdfinAt-KbrL-Q_n0RTcRLX'
+  'sb_publishable_zfRqJm0TvdfinAt-KbrL-Q_n0RTcRLX',
+  { global: { fetch: (url, opts) => fetch(url, { ...opts, cache:'no-store' }) } }
 );
-const sessionToUser = u => ({ email: u.email, name: u.user_metadata?.name || u.email.split('@')[0] });
+const sessionToUser = u => ({ id:u.id, email:u.email, name:u.user_metadata?.name || u.email.split('@')[0] });
+
+const fetchCloudData = async (userId) => {
+  const [vehiclesRes, histRes, workshopRes, docsRes] = await Promise.all([
+    supabase.from('vehicles').select('*').eq('user_id', userId).order('id'),
+    supabase.from('history').select('*').eq('user_id', userId),
+    supabase.from('workshop_entries').select('*').eq('user_id', userId),
+    supabase.from('documents').select('*').eq('user_id', userId),
+  ]);
+  const vRows = vehiclesRes.data || [];
+  const vehicles = vRows.map(v => ({
+    id:v.id, brand:v.brand, model:v.model, year:v.year, plate:v.plate,
+    km:v.km, color:v.color, addedDate:v.added_date, maints:v.maints,
+  }));
+  const fav = vRows.find(v=>v.is_favorite);
+  return {
+    vehicles,
+    hist: (histRes.data||[]).map(h=>({mid:h.mid, vid:h.vehicle_id, km:h.km, date:h.date, product:h.product||''})),
+    workshop: (workshopRes.data||[]).map(w=>({id:w.id, vid:w.vehicle_id, date:w.date, place:w.place, person:w.person, phone:w.phone, description:w.description, result:w.result, cost:w.cost, createdAt:w.created_at})),
+    docs: (docsRes.data||[]).map(d=>({id:d.id, name:d.name, type:d.type, date:d.date, addedAt:d.added_at})),
+    favoriteVehicleId: fav ? fav.id : (vehicles[0]?.id ?? null),
+  };
+};
 
 // iconId identifica el ícono SVG a usar (sin emojis)
 const MAINTS_DEFAULT = [
@@ -119,8 +142,9 @@ const overallStatus = (maints, km) => {
 const reducer = (s, a) => {
   switch(a.type) {
     case 'LOGIN':   return {...s, user:a.user};
+    case 'HYDRATE': return {...s, vehicles:a.vehicles, hist:a.hist, workshop:a.workshop, docs:a.docs, favoriteVehicleId:a.favoriteVehicleId};
     case 'ADD_VEH': {
-      const v = {...a.v, id:Date.now(), maints:MAINTS_DEFAULT.map(m=>({...m}))};
+      const v = {...a.v, id:a.v.id ?? Date.now(), maints:a.v.maints || MAINTS_DEFAULT.map(m=>({...m}))};
       return {...s, vehicles:[...s.vehicles,v], favoriteVehicleId:s.vehicles.length===0?v.id:s.favoriteVehicleId};
     }
     case 'SET_FAV': return {...s, favoriteVehicleId:a.id};
@@ -1195,28 +1219,137 @@ const Nav = ({active,onNav}) => {
 
 // ── App ───────────────────────────────────────────────────────────────
 const App = () => {
-  const [state,   dispatch]  = useReducer(reducer, null, ()=>load()||initState());
+  const [state,   rawDispatch] = useReducer(reducer, null, ()=>load()||initState());
   const [screen,  setScreen] = useState('home');
   const [addingV, setAddingV]= useState(false);
   const [authChecked, setAuthChecked] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
   useEffect(()=>save(state),[state]);
+
+  // dispatch envuelve rawDispatch: actualiza local al instante y persiste en Supabase en segundo plano.
+  // ADD_VEH/ADD_DOC/ADD_WORK insertan primero en la nube (para usar el id real) y recién ahí actualizan local.
+  const dispatch = useCallback((action) => {
+    const uid = state.user?.id;
+
+    if (action.type === 'ADD_VEH' && uid) {
+      (async () => {
+        const maints = MAINTS_DEFAULT.map(m=>({...m}));
+        const { data, error } = await supabase.from('vehicles').insert({
+          user_id:uid, brand:action.v.brand, model:action.v.model, year:action.v.year,
+          plate:action.v.plate, km:action.v.km, color:action.v.color,
+          added_date:action.v.addedDate, maints, is_favorite:state.vehicles.length===0,
+        }).select().single();
+        if (error) { console.error('ADD_VEH', error); alert('No se pudo guardar el vehículo. Revisá tu conexión.'); return; }
+        rawDispatch({ type:'ADD_VEH', v:{ ...action.v, id:data.id, maints } });
+      })();
+      return;
+    }
+    if (action.type === 'ADD_DOC' && uid) {
+      (async () => {
+        const { data, error } = await supabase.from('documents').insert({
+          user_id:uid, name:action.doc.name, type:action.doc.type,
+          date:action.doc.date || null, added_at:action.doc.addedAt,
+        }).select().single();
+        if (error) { console.error('ADD_DOC', error); alert('No se pudo guardar el documento. Revisá tu conexión.'); return; }
+        rawDispatch({ type:'ADD_DOC', doc:{ ...action.doc, id:data.id } });
+      })();
+      return;
+    }
+    if (action.type === 'ADD_WORK' && uid) {
+      (async () => {
+        const { data, error } = await supabase.from('workshop_entries').insert({
+          user_id:uid, vehicle_id:action.entry.vid, date:action.entry.date || null,
+          place:action.entry.place, person:action.entry.person, phone:action.entry.phone,
+          description:action.entry.description, result:action.entry.result,
+          cost:action.entry.cost, created_at:action.entry.createdAt,
+        }).select().single();
+        if (error) { console.error('ADD_WORK', error); alert('No se pudo guardar la visita. Revisá tu conexión.'); return; }
+        rawDispatch({ type:'ADD_WORK', entry:{ ...action.entry, id:data.id } });
+      })();
+      return;
+    }
+
+    rawDispatch(action);
+    if (!uid) return;
+
+    switch (action.type) {
+      case 'SET_FAV':
+        supabase.from('vehicles').update({ is_favorite:false }).eq('user_id', uid)
+          .then(() => supabase.from('vehicles').update({ is_favorite:true }).eq('id', action.id))
+          .then(null, err => console.error('SET_FAV', err));
+        break;
+      case 'UPD_KM':
+        supabase.from('vehicles').update({ km:action.km }).eq('id', action.vid).then(null, err=>console.error('UPD_KM', err));
+        break;
+      case 'APPLY': {
+        const vehicle = state.vehicles.find(v=>v.id===action.vid);
+        const maints = vehicle.maints.map(m=>m.id===action.mid?{...m,lastKm:action.km,lastDate:action.date,lastProduct:action.product||m.lastProduct||''}:m);
+        supabase.from('vehicles').update({ maints }).eq('id', action.vid).then(null, err=>console.error('APPLY maints', err));
+        supabase.from('history').insert({ user_id:uid, vehicle_id:action.vid, mid:action.mid, km:action.km, date:action.date, product:action.product||'' }).then(null, err=>console.error('APPLY history', err));
+        break;
+      }
+      case 'TOGGLE_CAT': {
+        const vehicle = state.vehicles.find(v=>v.id===action.vid);
+        const maints = vehicle.maints.map(m=>m.id===action.mid?{...m,cat:m.cat==='monthly'?'service':'monthly'}:m);
+        supabase.from('vehicles').update({ maints }).eq('id', action.vid).then(null, err=>console.error('TOGGLE_CAT', err));
+        break;
+      }
+      case 'UPD_MAINT_INTERVAL': {
+        const vehicle = state.vehicles.find(v=>v.id===action.vid);
+        const maints = vehicle.maints.map(m=>m.id===action.mid?{...m,...action.changes}:m);
+        supabase.from('vehicles').update({ maints }).eq('id', action.vid).then(null, err=>console.error('UPD_MAINT_INTERVAL', err));
+        break;
+      }
+      case 'DEL_DOC':
+        supabase.from('documents').delete().eq('id', action.id).then(null, err=>console.error('DEL_DOC', err));
+        break;
+      case 'UPD_WORK':
+        supabase.from('workshop_entries').update({
+          date:action.entry.date || null, place:action.entry.place, person:action.entry.person,
+          phone:action.entry.phone, description:action.entry.description, result:action.entry.result,
+          cost:action.entry.cost,
+        }).eq('id', action.entry.id).then(null, err=>console.error('UPD_WORK', err));
+        break;
+      case 'DEL_WORK':
+        supabase.from('workshop_entries').delete().eq('id', action.id).then(null, err=>console.error('DEL_WORK', err));
+        break;
+    }
+  }, [state]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({data:{session}}) => {
-      if (session?.user) dispatch({type:'LOGIN', user:sessionToUser(session.user)});
+      if (session?.user) rawDispatch({type:'LOGIN', user:sessionToUser(session.user)});
       setAuthChecked(true);
     });
     const { data:sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) dispatch({type:'LOGIN', user:sessionToUser(session.user)});
-      else dispatch({type:'RESET'});
+      if (session?.user) rawDispatch({type:'LOGIN', user:sessionToUser(session.user)});
+      else rawDispatch({type:'RESET'});
     });
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  const logout=()=>{ supabase.auth.signOut(); dispatch({type:'RESET'}); setScreen('home'); setAddingV(false); };
+  // Al loguearse, trae los datos reales desde Supabase y pisa lo que hubiera en localStorage.
+  // Espera a authChecked: state.user puede venir ya seteado desde el cache de localStorage
+  // antes de que Supabase termine de restaurar la sesión real, y consultar la nube en ese
+  // instante (sin token todavía aplicado) devuelve 0 filas por RLS, sin error.
+  useEffect(() => {
+    if (!authChecked || !state.user) { setDataLoaded(false); return; }
+    let active = true;
+    fetchCloudData(state.user.id).then(cloud => {
+      if (!active) return;
+      rawDispatch({ type:'HYDRATE', ...cloud });
+      setDataLoaded(true);
+    }).catch(err => { console.error('fetchCloudData', err); setDataLoaded(true); });
+    return () => { active = false; };
+  }, [authChecked, state.user?.id]);
 
-  if (!authChecked) return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--bg-0)'}}><Icon id="car" size={32} color="var(--green)"/></div>;
-  if (!state.user) return <Login onLogin={u=>dispatch({type:'LOGIN',user:u})}/>;
+  const logout=()=>{ supabase.auth.signOut(); rawDispatch({type:'RESET'}); setScreen('home'); setAddingV(false); };
+
+  const Loading = () => <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--bg-0)'}}><Icon id="car" size={32} color="var(--green)"/></div>;
+
+  if (!authChecked) return <Loading/>;
+  if (!state.user) return <Login onLogin={u=>rawDispatch({type:'LOGIN',user:u})}/>;
+  if (!dataLoaded) return <Loading/>;
   if (state.vehicles.length===0&&!addingV)
     return <VehicleForm title="Configuración inicial" subtitle={`Hola ${state.user.name} 👋 Configuremos el historial de tu auto.`}
       onComplete={v=>dispatch({type:'ADD_VEH',v})}/>;
