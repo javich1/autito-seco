@@ -1,4 +1,4 @@
-const CACHE = 'autito-seco-v2';
+const CACHE = 'autito-seco-v3';
 
 const ASSETS = [
   '/',
@@ -27,12 +27,19 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  if (!e.request.url.startsWith('http')) return; // ignora chrome-extension:// y otros esquemas no cacheables
+  const url = e.request.url;
+  if (!url.startsWith('http')) return; // ignora chrome-extension:// y otros esquemas no cacheables
+
+  // Solo cachear los assets propios de la app (mismo origen o los listados en ASSETS).
+  // Nunca cachear llamadas dinámicas (ej. API de Supabase) — siempre van a la red,
+  // si no, el celular puede quedar sirviendo datos viejos (autos/mantenimientos) para siempre.
+  const isOwnAsset = url.startsWith(self.location.origin) || ASSETS.includes(url);
+  if (!isOwnAsset) return;
+
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
       return fetch(e.request).then(response => {
-        // Cache successful GET requests
         if (e.request.method === 'GET' && response.status === 200) {
           const clone = response.clone();
           caches.open(CACHE).then(c => c.put(e.request, clone));
