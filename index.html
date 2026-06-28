@@ -57,7 +57,12 @@ const { useState, useEffect, useReducer, useCallback } = React;
 const STORE_KEY = 'autito_v1';
 const load = () => { try { return JSON.parse(localStorage.getItem(STORE_KEY)); } catch { return null; } };
 const save = d => localStorage.setItem(STORE_KEY, JSON.stringify(d));
-const todayStr = () => new Date().toISOString().slice(0,10);
+// OJO: usar componentes locales, no toISOString() (que es UTC) — de noche en
+// husos horarios negativos (ej. Argentina, UTC-3) la fecha UTC ya es el día siguiente.
+const todayStr = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+};
 
 // ── Supabase: Auth + datos en la nube (vehicles/history/workshop_entries/documents) ──
 const supabase = window.supabase.createClient(
