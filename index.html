@@ -154,6 +154,16 @@ const reducer = (s, a) => {
     }
     case 'SET_FAV': return {...s, favoriteVehicleId:a.id};
     case 'UPD_KM':  return {...s, vehicles:s.vehicles.map(v=>v.id===a.vid?{...v,km:a.km}:v)};
+    case 'UPD_VEH': return {...s, vehicles:s.vehicles.map(v=>v.id===a.vid?{...v,...a.changes}:v)};
+    case 'DEL_VEH': {
+      const vehicles = s.vehicles.filter(v=>v.id!==a.id);
+      const favoriteVehicleId = s.favoriteVehicleId===a.id ? (vehicles[0]?.id ?? null) : s.favoriteVehicleId;
+      return {
+        ...s, vehicles, favoriteVehicleId,
+        hist:s.hist.filter(h=>h.vid!==a.id),
+        workshop:(s.workshop||[]).filter(w=>w.vid!==a.id),
+      };
+    }
     case 'APPLY':   return {
       ...s,
       vehicles:s.vehicles.map(v=>v.id===a.vid?{...v,maints:v.maints.map(m=>m.id===a.mid?{...m,lastKm:a.km,lastDate:a.date,lastProduct:a.product||m.lastProduct||''}:m)}:v),
@@ -618,6 +628,29 @@ const Dashboard = ({state, dispatch, vehicle, vehicles, onNav}) => {
         </div>
       </div>
 
+      {/* Aviso de ítems vencidos o próximos a vencer */}
+      {(() => {
+        const due = vehicle.maints.filter(m=>{ const s=getStatus(m,vehicle.km); return s.registered && s.pct>=0.6; })
+          .sort((a,b)=>getStatus(b,vehicle.km).pct-getStatus(a,vehicle.km).pct);
+        if (!due.length) return null;
+        const urgentCount = due.filter(m=>getStatus(m,vehicle.km).pct>=0.8).length;
+        return (
+          <div style={{margin:'16px 16px 0',background:urgentCount?'var(--red-dim)':'var(--amber-dim)',border:`1px solid ${urgentCount?'rgba(232,90,74,.25)':'rgba(232,200,74,.25)'}`,borderRadius:'var(--radius-lg)',padding:'14px 16px'}}>
+            <p style={{fontSize:12,fontWeight:700,color:urgentCount?'var(--red)':'var(--amber)',marginBottom:8}}>
+              {urgentCount?`⚠ ${urgentCount} ítem${urgentCount>1?'s':''} requiere${urgentCount>1?'n':''} atención`:`${due.length} ítem${due.length>1?'s':''} próximo${due.length>1?'s':''} a vencer`}
+            </p>
+            <div style={{display:'flex',flexDirection:'column',gap:6}}>
+              {due.slice(0,3).map(m=>(
+                <button key={m.id} onClick={()=>setDetail(m)} style={{display:'flex',alignItems:'center',gap:8,background:'none',border:'none',padding:0,cursor:'pointer',textAlign:'left'}}>
+                  <Icon id={m.iconId||'wrench'} size={15} color={urgentCount?'var(--red)':'var(--amber)'}/>
+                  <span style={{fontSize:12,color:'var(--text-1)',fontWeight:500}}>{m.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       <div style={{padding:'20px 16px'}}>
         {/* Toggle vista Lista / Grilla */}
         <div style={{display:'flex',justifyContent:'flex-end',marginBottom:14}}>
@@ -702,7 +735,9 @@ const History = ({state, vehicle}) => {
               return (
                 <div key={i} style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-lg)',padding:'14px 16px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                   <div style={{display:'flex',gap:10,alignItems:'center'}}>
-                    <span style={{fontSize:20}}>{m?.icon}</span>
+                    <div style={{width:34,height:34,borderRadius:10,background:'var(--bg-3)',border:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                      <Icon id={m?.iconId||'wrench'} size={18} color="var(--green)"/>
+                    </div>
                     <div>
                       <p style={{fontWeight:600,fontSize:14}}>{m?.name}</p>
                       <p style={{fontSize:11,color:'var(--text-3)',marginTop:2}}>{new Date(h.date).toLocaleDateString('es-AR',{day:'2-digit',month:'short',year:'numeric'})}</p>
@@ -861,18 +896,6 @@ const Workshop = ({state, dispatch, vehicle}) => {
             <p style={{fontSize:14,color:'var(--text-1)',lineHeight:1.6}}>{e.description}</p>
           </div>
 
-          {/* Marcas/Productos — nueva sección */}
-          {e.products&&(
-            <div style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-xl)',padding:'20px',marginBottom:16}}>
-              <p style={{fontSize:11,color:'var(--text-3)',marginBottom:10,fontWeight:600,letterSpacing:'.05em',textTransform:'uppercase'}}>Marcas / Productos utilizados</p>
-              <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
-                {e.products.split(',').map((p,i)=>(
-                  <span key={i} style={{background:'var(--bg-3)',border:'1px solid var(--border)',borderRadius:99,padding:'4px 12px',fontSize:12,color:'var(--text-2)',fontWeight:500}}>{p.trim()}</span>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Resultado */}
           {e.result&&<div style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-xl)',padding:'20px',marginBottom:16}}><p style={{fontSize:11,color:'var(--text-3)',marginBottom:8,fontWeight:600,letterSpacing:'.05em',textTransform:'uppercase'}}>Resultado / Observaciones</p><p style={{fontSize:14,color:'var(--text-1)',lineHeight:1.6}}>{e.result}</p></div>}
 
@@ -916,11 +939,6 @@ const Workshop = ({state, dispatch, vehicle}) => {
                   {e.cost&&<span style={{fontFamily:'Space Mono',fontSize:13,fontWeight:700,color:'var(--green)',background:'var(--green-dim)',padding:'3px 8px',borderRadius:6,whiteSpace:'nowrap'}}>{fmt(e.cost)}</span>}
                 </div>
                 <p style={{fontSize:13,color:'var(--text-2)',lineHeight:1.5,overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>{e.description}</p>
-                {e.products&&(
-                  <p style={{fontSize:11,color:'var(--text-3)',marginTop:6}}>
-                    🏷 {e.products.split(',').slice(0,3).map(p=>p.trim()).join(' · ')}
-                  </p>
-                )}
                 {e.phone&&<p style={{fontSize:11,color:'var(--blue)',marginTop:6}}>📞 {e.phone}</p>}
               </div>
             ))}
@@ -933,7 +951,7 @@ const Workshop = ({state, dispatch, vehicle}) => {
 
 // ── FAQ Screen ────────────────────────────────────────────────────────
 const FAQ_ITEMS = [
-  { q:'¿Cómo funciona AutoCare?', a:'AutoCare es un historial clínico para tu vehículo. Registrás tu auto, cargás los mantenimientos a medida que los hacés, y la app te muestra el estado de cada uno con barras de salud y alertas de color.' },
+  { q:'¿Cómo funciona Autito Seco?', a:'Autito Seco es un historial clínico para tu vehículo. Registrás tu auto, cargás los mantenimientos a medida que los hacés, y la app te muestra el estado de cada uno con barras de salud y alertas de color.' },
   { q:'¿Qué significa la barra de porcentaje?', a:'La barra muestra la salud restante del ítem. 100% = recién revisado. A medida que pasan kilómetros o días, baja. Cuando llega a 0% o cambia a rojo, es hora de atenderlo.' },
   { q:'¿Cómo registro una revisión?', a:'Entrá al ítem desde el dashboard, elegí la fecha (puede ser una pasada si te olvidaste de cargarla) y el kilometraje al momento, y tocá "Confirmar revisión". El estado se actualiza automáticamente.' },
   { q:'¿Puedo agregar más de un vehículo?', a:'Sí. Desde el Perfil podés agregar tantos autos como quieras. El que marqués como favorito (⭐) es el que aparece en el dashboard por defecto. Podés cambiar entre ellos desde el mismo dashboard.' },
@@ -941,7 +959,7 @@ const FAQ_ITEMS = [
   { q:'¿Cómo funciona "Controles mensuales" vs "Mantenimiento"?', a:'Los controles mensuales son revisiones periódicas simples (como cubiertas y refrigerante). El mantenimiento incluye tareas más técnicas con intervalos por km o tiempo. Podés mover cualquier ítem entre las dos secciones según tu preferencia.' },
   { q:'¿Puedo personalizar los intervalos de cada ítem?', a:'Sí. Desde Perfil → Personalizar intervalos podés cambiar cada cuántos km o días te avisa cada ítem. Aparece el valor por defecto como referencia.' },
   { q:'¿Los datos se guardan si cierro la app?', a:'Sí. Todo se guarda automáticamente en el dispositivo. No necesitás crear cuenta con servidor — los datos persisten entre sesiones.' },
-  { q:'¿Qué pasa si registro un km mayor al actual del auto?', a:'AutoCare te muestra una advertencia y te ofrece actualizar el odómetro del vehículo con un solo toque, sin que tengas que hacerlo por separado.' },
+  { q:'¿Qué pasa si registro un km mayor al actual del auto?', a:'Autito Seco te muestra una advertencia y te ofrece actualizar el odómetro del vehículo con un solo toque, sin que tengas que hacerlo por separado.' },
   { q:'¿Puedo registrar una revisión con fecha pasada?', a:'Sí. En la pantalla de detalle de cada ítem podés elegir cualquier fecha anterior a hoy. La app muestra cuántos días atrás fue y calcula el estado correctamente desde esa fecha.' },
 ];
 
@@ -953,13 +971,13 @@ const FAQScreen = ({onBack}) => {
         <button onClick={onBack} style={{background:'none',border:'none',color:'var(--text-2)',cursor:'pointer',fontSize:22,padding:'0 4px',lineHeight:1}}>←</button>
         <div>
           <h2 style={{fontSize:17,fontWeight:600}}>Preguntas frecuentes</h2>
-          <p style={{fontSize:11,color:'var(--text-3)',marginTop:1}}>Cómo usar AutoCare</p>
+          <p style={{fontSize:11,color:'var(--text-3)',marginTop:1}}>Cómo usar Autito Seco</p>
         </div>
       </div>
       <div style={{padding:'20px 16px'}}>
         <div style={{background:'var(--accent-dim)',border:'1px solid rgba(124,111,255,.2)',borderRadius:'var(--radius-lg)',padding:'14px 16px',marginBottom:20,display:'flex',gap:10,alignItems:'flex-start'}}>
           <span style={{fontSize:20,flexShrink:0}}>🚗</span>
-          <p style={{fontSize:13,color:'rgba(200,195,255,.9)',lineHeight:1.5}}>AutoCare es tu historial clínico de vehículo. Registrá mantenimientos, visitás al taller y llevá el control de todo en un solo lugar.</p>
+          <p style={{fontSize:13,color:'rgba(200,195,255,.9)',lineHeight:1.5}}>Autito Seco es tu historial clínico de vehículo. Registrá mantenimientos, visitás al taller y llevá el control de todo en un solo lugar.</p>
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
           {FAQ_ITEMS.map((item,i)=>(
@@ -997,7 +1015,7 @@ const IntervalsScreen = ({vehicle, dispatch, onBack}) => {
       <div style={{background:'var(--bg-2)',border:`1px solid ${isEditing?'rgba(124,111,255,.3)':'var(--border)'}`,borderRadius:'var(--radius-lg)',marginBottom:10,overflow:'hidden'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px'}}>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <span style={{fontSize:20}}>{m.icon}</span>
+            <Icon id={m.iconId||'wrench'} size={20} color="var(--green)"/>
             <div>
               <div style={{display:'flex',alignItems:'center',gap:6}}>
                 <span style={{fontSize:13,fontWeight:600}}>{m.name}</span>
@@ -1055,7 +1073,7 @@ const IntervalsScreen = ({vehicle, dispatch, onBack}) => {
       </div>
       <div style={{padding:'20px 16px'}}>
         <div style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-lg)',padding:'12px 14px',marginBottom:20}}>
-          <p style={{fontSize:12,color:'var(--text-2)',lineHeight:1.5}}>Modificá cuándo querés que AutoCare te avise para cada ítem. Los valores marcados como <span style={{color:'var(--accent)',fontWeight:700}}>CUSTOM</span> son los que cambiaste.</p>
+          <p style={{fontSize:12,color:'var(--text-2)',lineHeight:1.5}}>Modificá cuándo querés que Autito Seco te avise para cada ítem. Los valores marcados como <span style={{color:'var(--accent)',fontWeight:700}}>CUSTOM</span> son los que cambiaste.</p>
         </div>
         {vehicle.maints.map(m=><MaintRow key={m.id} m={m}/>)}
       </div>
@@ -1064,11 +1082,27 @@ const IntervalsScreen = ({vehicle, dispatch, onBack}) => {
 };
 
 // ── VehicleDetailScreen ───────────────────────────────────────────────
-const VehicleDetailScreen = ({vehicle, isFav, dispatch, onBack, onGoToDashboard}) => {
+const VehicleDetailScreen = ({vehicle, isFav, dispatch, onBack, onGoToDashboard, onDeleted}) => {
   const [km, setKm] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
+  const [f, setF] = useState({brand:vehicle.brand, model:vehicle.model, year:String(vehicle.year), plate:vehicle.plate, color:vehicle.color});
   const ov = overallStatus(vehicle.maints, vehicle.km);
   const done = vehicle.maints.filter(m=>m.lastDate).length;
-  const carColor = vehicle.color || '#7C6FFF';
+  const carColor = editing ? (f.color||'#7C6FFF') : (vehicle.color || '#7C6FFF');
+  const setFv = (k,v) => setF(p=>({...p,[k]:v}));
+  const validEdit = f.brand && f.model && f.plate && f.color;
+
+  const saveEdit = () => {
+    if (!validEdit) return;
+    dispatch({type:'UPD_VEH', vid:vehicle.id, changes:{brand:f.brand, model:f.model, year:Number(f.year), plate:f.plate, color:f.color}});
+    setEditing(false);
+  };
+  const deleteVehicle = () => {
+    dispatch({type:'DEL_VEH', id:vehicle.id});
+    onDeleted();
+  };
+
   return (
     <div style={{minHeight:'100vh',background:'var(--bg-0)',paddingBottom:90}}>
       <div style={{background:'var(--bg-1)',borderBottom:'1px solid var(--border)',padding:'16px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:10}}>
@@ -1076,29 +1110,51 @@ const VehicleDetailScreen = ({vehicle, isFav, dispatch, onBack, onGoToDashboard}
           <button onClick={onBack} style={{background:'none',border:'none',color:'var(--text-2)',cursor:'pointer',fontSize:22,padding:'0 4px',lineHeight:1}}>←</button>
           <h2 style={{fontSize:17,fontWeight:600}}>{vehicle.brand} {vehicle.model}</h2>
         </div>
-        {isFav?<span style={{fontSize:18}}>⭐</span>:<button onClick={()=>dispatch({type:'SET_FAV',id:vehicle.id})} style={{background:'var(--bg-3)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',color:'var(--text-2)',fontSize:12,fontWeight:600,padding:'5px 10px',cursor:'pointer',fontFamily:'Sora,sans-serif'}}>☆ Marcar favorito</button>}
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          {isFav?<span style={{fontSize:18}}>⭐</span>:<button onClick={()=>dispatch({type:'SET_FAV',id:vehicle.id})} style={{background:'var(--bg-3)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',color:'var(--text-2)',fontSize:12,fontWeight:600,padding:'5px 10px',cursor:'pointer',fontFamily:'Sora,sans-serif'}}>☆ Marcar favorito</button>}
+          {!editing&&<button onClick={()=>{setF({brand:vehicle.brand,model:vehicle.model,year:String(vehicle.year),plate:vehicle.plate,color:vehicle.color});setEditing(true);}} style={{background:'var(--bg-3)',border:'1px solid var(--border)',color:'var(--text-2)',borderRadius:'var(--radius-sm)',padding:'6px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'Sora,sans-serif'}}>✏ Editar</button>}
+        </div>
       </div>
       <div style={{padding:'24px 20px'}}>
         <div style={{display:'flex',justifyContent:'center',marginBottom:20}}><CarSVG c={carColor}/></div>
-        <div style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-xl)',padding:'20px',marginBottom:16}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
-            <h3 style={{fontSize:15,fontWeight:600}}>Datos del vehículo</h3>
-            <Badge color={ov.color} label={ov.label}/>
-          </div>
-          {[['Marca / Modelo',`${vehicle.brand} ${vehicle.model}`,false],['Año',vehicle.year,false],['Patente',vehicle.plate.toUpperCase(),true],['Kilometraje',`${Number(vehicle.km).toLocaleString('es-AR')} km`,true],['Color',CAR_COLORS.find(c=>c.hex===vehicle.color)?.name||vehicle.color||'—',false]].map(([l,v,mono])=>(
-            <div key={l} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
-              <span style={{fontSize:13,color:'var(--text-3)'}}>{l}</span>
-              <div style={{display:'flex',alignItems:'center',gap:8}}>
-                {l==='Color'&&vehicle.color&&<div style={{width:14,height:14,borderRadius:'50%',background:vehicle.color,border:'1px solid rgba(255,255,255,.2)'}}/>}
-                <span style={{fontSize:13,fontWeight:700,fontFamily:mono?'Space Mono':'Sora'}}>{v}</span>
+
+        {editing ? (
+          <div style={{background:'var(--bg-2)',border:'1px solid var(--accent)',borderRadius:'var(--radius-xl)',padding:'20px',marginBottom:16}}>
+            <h3 style={{fontSize:15,fontWeight:600,marginBottom:14}}>Editar datos del vehículo</h3>
+            {[{k:'brand',l:'Marca'},{k:'model',l:'Modelo'},{k:'year',l:'Año',t:'number'},{k:'plate',l:'Patente'}].map(ff=>(
+              <div key={ff.k} style={{marginBottom:12}}>
+                <label style={{fontSize:12,color:'var(--text-3)',display:'block',marginBottom:5,fontWeight:500}}>{ff.l}</label>
+                <input type={ff.t||'text'} value={f[ff.k]} onChange={e=>setFv(ff.k,e.target.value)}/>
               </div>
+            ))}
+            <div style={{marginBottom:16}}><ColorPicker value={f.color} onChange={v=>setFv('color',v)}/></div>
+            <div style={{display:'flex',gap:10}}>
+              <Btn onClick={()=>setEditing(false)} v="ghost" style={{flex:1,justifyContent:'center'}}>Cancelar</Btn>
+              <Btn onClick={saveEdit} disabled={!validEdit} style={{flex:1,justifyContent:'center'}}>Guardar</Btn>
             </div>
-          ))}
-          <div style={{marginTop:12}}>
-            <p style={{fontSize:11,color:'var(--text-3)',marginBottom:4}}>Revisiones completadas</p>
-            <p style={{fontFamily:'Space Mono',fontSize:22,fontWeight:700}}>{done}<span style={{fontSize:13,color:'var(--text-3)',fontFamily:'Sora'}}>/{vehicle.maints.length}</span></p>
           </div>
-        </div>
+        ) : (
+          <div style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-xl)',padding:'20px',marginBottom:16}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+              <h3 style={{fontSize:15,fontWeight:600}}>Datos del vehículo</h3>
+              <Badge color={ov.color} label={ov.label}/>
+            </div>
+            {[['Marca / Modelo',`${vehicle.brand} ${vehicle.model}`,false],['Año',vehicle.year,false],['Patente',vehicle.plate.toUpperCase(),true],['Kilometraje',`${Number(vehicle.km).toLocaleString('es-AR')} km`,true],['Color',CAR_COLORS.find(c=>c.hex===vehicle.color)?.name||vehicle.color||'—',false]].map(([l,v,mono])=>(
+              <div key={l} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
+                <span style={{fontSize:13,color:'var(--text-3)'}}>{l}</span>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  {l==='Color'&&vehicle.color&&<div style={{width:14,height:14,borderRadius:'50%',background:vehicle.color,border:'1px solid rgba(255,255,255,.2)'}}/>}
+                  <span style={{fontSize:13,fontWeight:700,fontFamily:mono?'Space Mono':'Sora'}}>{v}</span>
+                </div>
+              </div>
+            ))}
+            <div style={{marginTop:12}}>
+              <p style={{fontSize:11,color:'var(--text-3)',marginBottom:4}}>Revisiones completadas</p>
+              <p style={{fontFamily:'Space Mono',fontSize:22,fontWeight:700}}>{done}<span style={{fontSize:13,color:'var(--text-3)',fontFamily:'Sora'}}>/{vehicle.maints.length}</span></p>
+            </div>
+          </div>
+        )}
+
         <div style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-xl)',padding:'20px',marginBottom:16}}>
           <h3 style={{fontSize:14,fontWeight:600,marginBottom:12}}>Actualizar kilometraje</h3>
           <div style={{display:'flex',gap:10}}>
@@ -1106,9 +1162,23 @@ const VehicleDetailScreen = ({vehicle, isFav, dispatch, onBack, onGoToDashboard}
             <Btn onClick={()=>{if(Number(km)>0){dispatch({type:'UPD_KM',vid:vehicle.id,km:Number(km)});setKm('');}}} disabled={!km||Number(km)<=0}>OK</Btn>
           </div>
         </div>
-        <Btn onClick={()=>{ dispatch({type:'SET_FAV',id:vehicle.id}); onGoToDashboard(); }} style={{width:'100%',justifyContent:'center'}} sz="lg">
+
+        <Btn onClick={()=>{ dispatch({type:'SET_FAV',id:vehicle.id}); onGoToDashboard(); }} style={{width:'100%',justifyContent:'center',marginBottom:16}} sz="lg">
           {isFav?'Ver en dashboard →':'Ir al dashboard con este auto →'}
         </Btn>
+
+        {confirmDel ? (
+          <div style={{background:'var(--red-dim)',border:'1px solid rgba(232,90,74,.25)',borderRadius:'var(--radius-xl)',padding:'18px'}}>
+            <p style={{fontSize:13,color:'var(--red)',fontWeight:600,marginBottom:4}}>¿Eliminar {vehicle.brand} {vehicle.model}?</p>
+            <p style={{fontSize:12,color:'var(--text-2)',marginBottom:14}}>Se borra también su historial y las visitas al taller. No se puede deshacer.</p>
+            <div style={{display:'flex',gap:10}}>
+              <Btn onClick={()=>setConfirmDel(false)} v="ghost" style={{flex:1,justifyContent:'center'}}>Cancelar</Btn>
+              <Btn onClick={deleteVehicle} v="danger" style={{flex:1,justifyContent:'center'}}>Sí, eliminar</Btn>
+            </div>
+          </div>
+        ) : (
+          <button onClick={()=>setConfirmDel(true)} style={{width:'100%',background:'none',border:'none',color:'var(--red)',fontSize:12,fontWeight:600,padding:'8px',cursor:'pointer',fontFamily:'DM Sans,sans-serif',textDecoration:'underline',textDecorationStyle:'dotted'}}>Eliminar vehículo</button>
+        )}
       </div>
     </div>
   );
@@ -1129,6 +1199,7 @@ const Profile = ({state, dispatch, onLogout, onAddVehicle, onNav}) => {
     return <VehicleDetailScreen vehicle={v} isFav={v.id===favoriteVehicleId} dispatch={dispatch}
       onBack={()=>setSubScreen(null)}
       onGoToDashboard={()=>{ setSubScreen(null); onNav('home'); }}
+      onDeleted={()=>setSubScreen(null)}
     />;
   }
 
@@ -1191,7 +1262,7 @@ const Profile = ({state, dispatch, onLogout, onAddVehicle, onNav}) => {
         {/* Opciones de configuración */}
         <div style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-xl)',padding:'4px 20px',marginBottom:16}}>
           <ProfileRow icon="⚙️" label="Personalizar intervalos" sub={favV?`${favV.brand} ${favV.model}`:'Configurar alertas'} onPress={()=>setSubScreen('intervals')}/>
-          <ProfileRow icon="❓" label="Preguntas frecuentes" sub="Cómo usar AutoCare" onPress={()=>setSubScreen('faq')}/>
+          <ProfileRow icon="❓" label="Preguntas frecuentes" sub="Cómo usar Autito Seco" onPress={()=>setSubScreen('faq')}/>
         </div>
 
         <Btn onClick={onLogout} v="danger" style={{width:'100%',justifyContent:'center'}} sz="lg">Cerrar sesión</Btn>
@@ -1229,7 +1300,32 @@ const App = () => {
   const [addingV, setAddingV]= useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [pendingSync, setPendingSync] = useState(0);
+  const [online, setOnline] = useState(navigator.onLine);
+  const [toast, setToast] = useState('');
   useEffect(()=>save(state),[state]);
+
+  useEffect(() => {
+    const goOnline = () => setOnline(true);
+    const goOffline = () => setOnline(false);
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => { window.removeEventListener('online', goOnline); window.removeEventListener('offline', goOffline); };
+  }, []);
+
+  const showToast = useCallback((msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(t => t===msg ? '' : t), 4000);
+  }, []);
+
+  // Envuelve una promesa de Supabase: cuenta como "sincronizando" mientras está en vuelo
+  // y muestra un toast amigable si falla (en vez del alert() nativo de antes).
+  const track = useCallback((promise, failMsg) => {
+    setPendingSync(n=>n+1);
+    return promise
+      .catch(err => { console.error(failMsg, err); showToast(failMsg + (online?'.':' — estás sin conexión.')); throw err; })
+      .finally(() => setPendingSync(n=>Math.max(0,n-1)));
+  }, [online, showToast]);
 
   // dispatch envuelve rawDispatch: actualiza local al instante y persiste en Supabase en segundo plano.
   // ADD_VEH/ADD_DOC/ADD_WORK insertan primero en la nube (para usar el id real) y recién ahí actualizan local.
@@ -1237,40 +1333,34 @@ const App = () => {
     const uid = state.user?.id;
 
     if (action.type === 'ADD_VEH' && uid) {
-      (async () => {
-        const maints = MAINTS_DEFAULT.map(m=>({...m}));
-        const { data, error } = await supabase.from('vehicles').insert({
-          user_id:uid, brand:action.v.brand, model:action.v.model, year:action.v.year,
-          plate:action.v.plate, km:action.v.km, color:action.v.color,
-          added_date:action.v.addedDate, maints, is_favorite:state.vehicles.length===0,
-        }).select().single();
-        if (error) { console.error('ADD_VEH', error); alert('No se pudo guardar el vehículo. Revisá tu conexión.'); return; }
+      const maints = MAINTS_DEFAULT.map(m=>({...m}));
+      track(supabase.from('vehicles').insert({
+        user_id:uid, brand:action.v.brand, model:action.v.model, year:action.v.year,
+        plate:action.v.plate, km:action.v.km, color:action.v.color,
+        added_date:action.v.addedDate, maints, is_favorite:state.vehicles.length===0,
+      }).select().single(), 'No se pudo guardar el vehículo').then(({data}) => {
         rawDispatch({ type:'ADD_VEH', v:{ ...action.v, id:data.id, maints } });
-      })();
+      }).catch(() => {});
       return;
     }
     if (action.type === 'ADD_DOC' && uid) {
-      (async () => {
-        const { data, error } = await supabase.from('documents').insert({
-          user_id:uid, name:action.doc.name, type:action.doc.type,
-          date:action.doc.date || null, added_at:action.doc.addedAt,
-        }).select().single();
-        if (error) { console.error('ADD_DOC', error); alert('No se pudo guardar el documento. Revisá tu conexión.'); return; }
+      track(supabase.from('documents').insert({
+        user_id:uid, name:action.doc.name, type:action.doc.type,
+        date:action.doc.date || null, added_at:action.doc.addedAt,
+      }).select().single(), 'No se pudo guardar el documento').then(({data}) => {
         rawDispatch({ type:'ADD_DOC', doc:{ ...action.doc, id:data.id } });
-      })();
+      }).catch(() => {});
       return;
     }
     if (action.type === 'ADD_WORK' && uid) {
-      (async () => {
-        const { data, error } = await supabase.from('workshop_entries').insert({
-          user_id:uid, vehicle_id:action.entry.vid, date:action.entry.date || null,
-          place:action.entry.place, person:action.entry.person, phone:action.entry.phone,
-          description:action.entry.description, result:action.entry.result,
-          cost:action.entry.cost, created_at:action.entry.createdAt,
-        }).select().single();
-        if (error) { console.error('ADD_WORK', error); alert('No se pudo guardar la visita. Revisá tu conexión.'); return; }
+      track(supabase.from('workshop_entries').insert({
+        user_id:uid, vehicle_id:action.entry.vid, date:action.entry.date || null,
+        place:action.entry.place, person:action.entry.person, phone:action.entry.phone,
+        description:action.entry.description, result:action.entry.result,
+        cost:action.entry.cost, created_at:action.entry.createdAt,
+      }).select().single(), 'No se pudo guardar la visita').then(({data}) => {
         rawDispatch({ type:'ADD_WORK', entry:{ ...action.entry, id:data.id } });
-      })();
+      }).catch(() => {});
       return;
     }
 
@@ -1279,47 +1369,52 @@ const App = () => {
 
     switch (action.type) {
       case 'SET_FAV':
-        supabase.from('vehicles').update({ is_favorite:false }).eq('user_id', uid)
-          .then(() => supabase.from('vehicles').update({ is_favorite:true }).eq('id', action.id))
-          .then(null, err => console.error('SET_FAV', err));
+        track(supabase.from('vehicles').update({ is_favorite:false }).eq('user_id', uid)
+          .then(() => supabase.from('vehicles').update({ is_favorite:true }).eq('id', action.id)), 'No se pudo guardar el favorito').catch(()=>{});
         break;
       case 'UPD_KM':
-        supabase.from('vehicles').update({ km:action.km }).eq('id', action.vid).then(null, err=>console.error('UPD_KM', err));
+        track(supabase.from('vehicles').update({ km:action.km }).eq('id', action.vid), 'No se pudo guardar el kilometraje').catch(()=>{});
+        break;
+      case 'UPD_VEH':
+        track(supabase.from('vehicles').update(action.changes).eq('id', action.vid), 'No se pudo guardar los datos del vehículo').catch(()=>{});
+        break;
+      case 'DEL_VEH':
+        track(supabase.from('vehicles').delete().eq('id', action.id), 'No se pudo eliminar el vehículo').catch(()=>{});
         break;
       case 'APPLY': {
         const vehicle = state.vehicles.find(v=>v.id===action.vid);
         const maints = vehicle.maints.map(m=>m.id===action.mid?{...m,lastKm:action.km,lastDate:action.date,lastProduct:action.product||m.lastProduct||''}:m);
-        supabase.from('vehicles').update({ maints }).eq('id', action.vid).then(null, err=>console.error('APPLY maints', err));
-        supabase.from('history').insert({ user_id:uid, vehicle_id:action.vid, mid:action.mid, km:action.km, date:action.date, product:action.product||'' }).then(null, err=>console.error('APPLY history', err));
+        track(supabase.from('vehicles').update({ maints }).eq('id', action.vid), 'No se pudo guardar la revisión').catch(()=>{});
+        track(supabase.from('history').insert({ user_id:uid, vehicle_id:action.vid, mid:action.mid, km:action.km, date:action.date, product:action.product||'' }), 'No se pudo guardar el historial').catch(()=>{});
         break;
       }
       case 'TOGGLE_CAT': {
         const vehicle = state.vehicles.find(v=>v.id===action.vid);
         const maints = vehicle.maints.map(m=>m.id===action.mid?{...m,cat:m.cat==='monthly'?'service':'monthly'}:m);
-        supabase.from('vehicles').update({ maints }).eq('id', action.vid).then(null, err=>console.error('TOGGLE_CAT', err));
+        track(supabase.from('vehicles').update({ maints }).eq('id', action.vid), 'No se pudo mover el ítem').catch(()=>{});
         break;
       }
       case 'UPD_MAINT_INTERVAL': {
         const vehicle = state.vehicles.find(v=>v.id===action.vid);
         const maints = vehicle.maints.map(m=>m.id===action.mid?{...m,...action.changes}:m);
-        supabase.from('vehicles').update({ maints }).eq('id', action.vid).then(null, err=>console.error('UPD_MAINT_INTERVAL', err));
+        track(supabase.from('vehicles').update({ maints }).eq('id', action.vid), 'No se pudo guardar el intervalo').catch(()=>{});
         break;
       }
       case 'DEL_DOC':
-        supabase.from('documents').delete().eq('id', action.id).then(null, err=>console.error('DEL_DOC', err));
+        track(supabase.from('documents').delete().eq('id', action.id), 'No se pudo borrar el documento').catch(()=>{});
         break;
       case 'UPD_WORK':
-        supabase.from('workshop_entries').update({
+        track(supabase.from('workshop_entries').update({
           date:action.entry.date || null, place:action.entry.place, person:action.entry.person,
           phone:action.entry.phone, description:action.entry.description, result:action.entry.result,
           cost:action.entry.cost,
-        }).eq('id', action.entry.id).then(null, err=>console.error('UPD_WORK', err));
+        }).eq('id', action.entry.id), 'No se pudo guardar la visita').catch(()=>{});
         break;
       case 'DEL_WORK':
-        supabase.from('workshop_entries').delete().eq('id', action.id).then(null, err=>console.error('DEL_WORK', err));
+        track(supabase.from('workshop_entries').delete().eq('id', action.id), 'No se pudo borrar la visita').catch(()=>{});
         break;
     }
-  }, [state]);
+  }, [state, track]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({data:{session}}) => {
@@ -1352,20 +1447,41 @@ const App = () => {
 
   const Loading = () => <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--bg-0)'}}><Icon id="car" size={32} color="var(--green)"/></div>;
 
+  const StatusBanners = () => (
+    <>
+      {!online && (
+        <div style={{position:'fixed',top:0,left:0,right:0,zIndex:200,background:'var(--amber-dim)',borderBottom:'1px solid rgba(232,200,74,.25)',color:'var(--amber)',fontSize:12,fontWeight:600,textAlign:'center',padding:'8px 12px'}}>
+          Sin conexión — los cambios se van a guardar cuando vuelva internet
+        </div>
+      )}
+      {online && pendingSync>0 && (
+        <div style={{position:'fixed',top:0,left:0,right:0,zIndex:199,background:'var(--bg-3)',borderBottom:'1px solid var(--border)',color:'var(--text-2)',fontSize:12,fontWeight:600,textAlign:'center',padding:'6px 12px'}}>
+          Guardando…
+        </div>
+      )}
+      {toast && (
+        <div style={{position:'fixed',bottom:90,left:16,right:16,zIndex:200,background:'var(--red-dim)',border:'1px solid rgba(232,90,74,.25)',color:'var(--red)',fontSize:13,fontWeight:600,textAlign:'center',padding:'12px 16px',borderRadius:'var(--radius-lg)'}}>
+          {toast}
+        </div>
+      )}
+    </>
+  );
+
   if (!authChecked) return <Loading/>;
   if (!state.user) return <Login onLogin={u=>rawDispatch({type:'LOGIN',user:u})}/>;
   if (!dataLoaded) return <Loading/>;
   if (state.vehicles.length===0&&!addingV)
-    return <VehicleForm title="Configuración inicial" subtitle={`Hola ${state.user.name} 👋 Configuremos el historial de tu auto.`}
-      onComplete={v=>dispatch({type:'ADD_VEH',v})}/>;
+    return <><StatusBanners/><VehicleForm title="Configuración inicial" subtitle={`Hola ${state.user.name} 👋 Configuremos el historial de tu auto.`}
+      onComplete={v=>dispatch({type:'ADD_VEH',v})}/></>;
   if (addingV)
-    return <VehicleForm onCancel={()=>setAddingV(false)} title="Agregar vehículo"
-      onComplete={v=>{ dispatch({type:'ADD_VEH',v}); setAddingV(false); setScreen('profile'); }}/>;
+    return <><StatusBanners/><VehicleForm onCancel={()=>setAddingV(false)} title="Agregar vehículo"
+      onComplete={v=>{ dispatch({type:'ADD_VEH',v}); setAddingV(false); setScreen('profile'); }}/></>;
 
   const favVehicle = state.vehicles.find(v=>v.id===state.favoriteVehicleId)||state.vehicles[0];
 
   return (
     <div style={{maxWidth:480,margin:'0 auto',position:'relative'}}>
+      <StatusBanners/>
       {screen==='home'     && <Dashboard state={state} dispatch={dispatch} vehicle={favVehicle} vehicles={state.vehicles} onNav={setScreen}/>}
       {screen==='workshop' && <Workshop  state={state} dispatch={dispatch} vehicle={favVehicle}/>}
       {screen==='history'  && <History   state={state} vehicle={favVehicle}/>}
