@@ -435,7 +435,7 @@ const MaintDetail = ({m, vehicle, onApply, onBack, onToggleCat, dispatch}) => {
         <div style={{background:'var(--bg-2)',borderRadius:'var(--radius-xl)',padding:'20px 18px',marginBottom:16,border:'1px solid var(--border)'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
             <p style={{fontSize:12,color:'var(--text-3)'}}>{s.registered?'Estado de salud':'Sin registros aún'}</p>
-            <p style={{fontFamily:'Space Mono',fontSize:20,fontWeight:700,color:cMap[s.color]}}>{s.registered?`${pctD}%`:'—'}</p>
+            <p style={{fontSize:20,fontWeight:700,color:cMap[s.color]}}>{s.registered?`${pctD}%`:'—'}</p>
           </div>
           <div style={{height:12,background:'var(--bg-4)',borderRadius:99,overflow:'hidden',marginBottom:10}}>
             <div style={{height:'100%',width:`${pctD}%`,background:cMap[s.color],borderRadius:99,boxShadow:`0 0 12px ${cMap[s.color]}50`,transition:'width .6s'}}/>
@@ -447,7 +447,7 @@ const MaintDetail = ({m, vehicle, onApply, onBack, onToggleCat, dispatch}) => {
           {[['Último mant.',m.lastDate?new Date(m.lastDate).toLocaleDateString('es-AR'):'—'],['Días desde rev.',days!==null?`${days} días`:'—'],['KM en revisión',m.lastKm!=null?m.lastKm.toLocaleString('es-AR')+' km':'—'],['KM restantes',s.kmLeft!==null?s.kmLeft.toLocaleString('es-AR')+' km':(m.iKm?'Ingresar KM':'N/A')]].map(([l,v])=>(
             <div key={l} style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-md)',padding:'12px 14px'}}>
               <p style={{fontSize:11,color:'var(--text-3)',marginBottom:4}}>{l}</p>
-              <p style={{fontWeight:700,fontSize:14,fontFamily:'Space Mono'}}>{v}</p>
+              <p style={{fontWeight:700,fontSize:14}}>{v}</p>
             </div>
           ))}
         </div>
@@ -603,7 +603,7 @@ const Dashboard = ({state, dispatch, vehicle, vehicles, onNav}) => {
           <span style={{fontSize:10,color:'var(--text-3)'}}>{sub()}</span>
           <Badge color={s.color} label={s.pct>=1?'Urgente':s.pct>=0.6?'Próximo':s.registered?'OK':'—'}/>
         </div>
-        {s.registered&&<p style={{fontFamily:'Space Mono',fontSize:13,fontWeight:700,color:cMap[s.color]}}>{healthD}%</p>}
+        {s.registered&&<p style={{fontSize:13,fontWeight:700,color:cMap[s.color]}}>{healthD}%</p>}
       </div>
     );
   };
@@ -625,7 +625,7 @@ const Dashboard = ({state, dispatch, vehicle, vehicles, onNav}) => {
               {vehicles.length>1&&<button onClick={()=>setVcModal(true)} style={{background:'var(--bg-3)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text-3)',fontSize:11,padding:'2px 7px',cursor:'pointer',fontFamily:'Sora,sans-serif'}}>Cambiar auto ↕</button>}
             </div>
             <p style={{fontSize:13,color:'var(--text-2)',marginTop:6}}>
-              <span style={{fontFamily:'Space Mono',background:'var(--bg-3)',padding:'2px 8px',borderRadius:6,fontSize:12,marginRight:8}}>{vehicle.plate.toUpperCase()}</span>
+              <span style={{background:'var(--bg-3)',padding:'2px 8px',borderRadius:6,fontSize:12,marginRight:8}}>{vehicle.plate.toUpperCase()}</span>
               {vehicle.year}
             </p>
           </div>
@@ -637,7 +637,7 @@ const Dashboard = ({state, dispatch, vehicle, vehicles, onNav}) => {
             <div style={{position:'relative',width:96,height:96}}>
               <Ring pct={overallHealth} size={96} stroke={9} color={cMap[ov.color]}/>
               <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center'}}>
-                <p style={{fontFamily:'Space Mono',fontSize:18,fontWeight:800,color:cMap[ov.color]}}>{Math.round(overallHealth*100)}%</p>
+                <p style={{fontSize:18,fontWeight:800,color:cMap[ov.color]}}>{Math.round(overallHealth*100)}%</p>
               </div>
             </div>
             <p style={{fontSize:11,color:'var(--text-3)',marginTop:8,fontWeight:600,textAlign:'center'}}>{ov.label}</p>
@@ -645,7 +645,7 @@ const Dashboard = ({state, dispatch, vehicle, vehicles, onNav}) => {
           <div style={{background:'var(--bg-3)',border:'1px solid var(--border)',borderRadius:'var(--radius-xl)',padding:'18px 16px',display:'flex',flexDirection:'column',justifyContent:'space-between'}}>
             <div>
               <p style={{fontSize:11,color:'var(--text-3)',marginBottom:4}}>Kilometraje actual</p>
-              <p style={{fontFamily:'Space Mono',fontSize:26,fontWeight:800}}>{Number(vehicle.km).toLocaleString('es-AR')}<span style={{fontSize:14,color:'var(--text-3)',fontWeight:500}}> km</span></p>
+              <p style={{fontSize:26,fontWeight:800}}>{Number(vehicle.km).toLocaleString('es-AR')}<span style={{fontSize:14,color:'var(--text-3)',fontWeight:500}}> km</span></p>
             </div>
             <Btn onClick={()=>{setNewKm('');setKmModal(true);}} v="ghost" sz="sm" style={{alignSelf:'flex-start',marginTop:10}}>Actualizar</Btn>
           </div>
@@ -767,7 +767,7 @@ const History = ({state, vehicle}) => {
                       <p style={{fontSize:11,color:'var(--text-3)',marginTop:2}}>{new Date(h.date).toLocaleDateString('es-AR',{day:'2-digit',month:'short',year:'numeric'})}</p>
                     </div>
                   </div>
-                  <p style={{fontFamily:'Space Mono',fontSize:13,fontWeight:700,color:'var(--text-2)'}}>{h.km.toLocaleString('es-AR')} km</p>
+                  <p style={{fontSize:13,fontWeight:700,color:'var(--text-2)'}}>{h.km.toLocaleString('es-AR')} km</p>
                 </div>
               );
             })}
@@ -909,7 +909,7 @@ const Workshop = ({state, dispatch, vehicle}) => {
               <div style={{borderTop:'1px solid var(--border)',paddingTop:14}}>
                 <p style={{fontSize:11,color:'var(--text-3)',marginBottom:8,fontWeight:600,letterSpacing:'.05em',textTransform:'uppercase'}}>Contacto</p>
                 {e.person&&<div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}><span style={{fontSize:16}}>👤</span><span style={{fontSize:14,fontWeight:500}}>{e.person}</span></div>}
-                {e.phone&&<div style={{display:'flex',alignItems:'center',gap:8}}><span style={{fontSize:16}}>📞</span><a href={`tel:${e.phone}`} style={{fontSize:14,color:'var(--blue)',fontFamily:'Space Mono',textDecoration:'none',fontWeight:600}}>{e.phone}</a></div>}
+                {e.phone&&<div style={{display:'flex',alignItems:'center',gap:8}}><span style={{fontSize:16}}>📞</span><a href={`tel:${e.phone}`} style={{fontSize:14,color:'var(--blue)',textDecoration:'none',fontWeight:600}}>{e.phone}</a></div>}
               </div>
             )}
           </div>
@@ -924,7 +924,7 @@ const Workshop = ({state, dispatch, vehicle}) => {
           {e.result&&<div style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-xl)',padding:'20px',marginBottom:16}}><p style={{fontSize:11,color:'var(--text-3)',marginBottom:8,fontWeight:600,letterSpacing:'.05em',textTransform:'uppercase'}}>Resultado / Observaciones</p><p style={{fontSize:14,color:'var(--text-1)',lineHeight:1.6}}>{e.result}</p></div>}
 
           {/* Costo */}
-          {e.cost&&<div style={{background:'var(--green-dim)',border:'1px solid rgba(46,232,154,.15)',borderRadius:'var(--radius-xl)',padding:'20px'}}><p style={{fontSize:11,color:'rgba(46,232,154,.6)',marginBottom:6,fontWeight:600,letterSpacing:'.05em',textTransform:'uppercase'}}>Costo total</p><p style={{fontFamily:'Space Mono',fontSize:26,fontWeight:700,color:'var(--green)'}}>{fmt(e.cost)}</p></div>}
+          {e.cost&&<div style={{background:'var(--green-dim)',border:'1px solid rgba(46,232,154,.15)',borderRadius:'var(--radius-xl)',padding:'20px'}}><p style={{fontSize:11,color:'rgba(46,232,154,.6)',marginBottom:6,fontWeight:600,letterSpacing:'.05em',textTransform:'uppercase'}}>Costo total</p><p style={{fontSize:26,fontWeight:700,color:'var(--green)'}}>{fmt(e.cost)}</p></div>}
         </div>
       </div>
     );
@@ -960,7 +960,7 @@ const Workshop = ({state, dispatch, vehicle}) => {
                       <p style={{fontSize:11,color:'var(--text-3)',marginTop:2}}>{new Date(e.date+'T12:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'short',year:'numeric'})}{e.person&&` · ${e.person}`}</p>
                     </div>
                   </div>
-                  {e.cost&&<span style={{fontFamily:'Space Mono',fontSize:13,fontWeight:700,color:'var(--green)',background:'var(--green-dim)',padding:'3px 8px',borderRadius:6,whiteSpace:'nowrap'}}>{fmt(e.cost)}</span>}
+                  {e.cost&&<span style={{fontSize:13,fontWeight:700,color:'var(--green)',background:'var(--green-dim)',padding:'3px 8px',borderRadius:6,whiteSpace:'nowrap'}}>{fmt(e.cost)}</span>}
                 </div>
                 <p style={{fontSize:13,color:'var(--text-2)',lineHeight:1.5,overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>{e.description}</p>
                 {e.phone&&<p style={{fontSize:11,color:'var(--blue)',marginTop:6}}>📞 {e.phone}</p>}
@@ -1163,18 +1163,18 @@ const VehicleDetailScreen = ({vehicle, isFav, dispatch, onBack, onGoToDashboard,
               <h3 style={{fontSize:15,fontWeight:600}}>Datos del vehículo</h3>
               <Badge color={ov.color} label={ov.label}/>
             </div>
-            {[['Marca / Modelo',`${vehicle.brand} ${vehicle.model}`,false],['Año',vehicle.year,false],['Patente',vehicle.plate.toUpperCase(),true],['Kilometraje',`${Number(vehicle.km).toLocaleString('es-AR')} km`,true],['Color',CAR_COLORS.find(c=>c.hex===vehicle.color)?.name||vehicle.color||'—',false]].map(([l,v,mono])=>(
+            {[['Marca / Modelo',`${vehicle.brand} ${vehicle.model}`],['Año',vehicle.year],['Patente',vehicle.plate.toUpperCase()],['Kilometraje',`${Number(vehicle.km).toLocaleString('es-AR')} km`],['Color',CAR_COLORS.find(c=>c.hex===vehicle.color)?.name||vehicle.color||'—']].map(([l,v])=>(
               <div key={l} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
                 <span style={{fontSize:13,color:'var(--text-3)'}}>{l}</span>
                 <div style={{display:'flex',alignItems:'center',gap:8}}>
                   {l==='Color'&&vehicle.color&&<div style={{width:14,height:14,borderRadius:'50%',background:vehicle.color,border:'1px solid rgba(255,255,255,.2)'}}/>}
-                  <span style={{fontSize:13,fontWeight:700,fontFamily:mono?'Space Mono':'Sora'}}>{v}</span>
+                  <span style={{fontSize:13,fontWeight:700}}>{v}</span>
                 </div>
               </div>
             ))}
             <div style={{marginTop:12}}>
               <p style={{fontSize:11,color:'var(--text-3)',marginBottom:4}}>Revisiones completadas</p>
-              <p style={{fontFamily:'Space Mono',fontSize:22,fontWeight:700}}>{done}<span style={{fontSize:13,color:'var(--text-3)',fontFamily:'Sora'}}>/{vehicle.maints.length}</span></p>
+              <p style={{fontSize:22,fontWeight:700}}>{done}<span style={{fontSize:13,color:'var(--text-3)',fontFamily:'Sora'}}>/{vehicle.maints.length}</span></p>
             </div>
           </div>
         )}
@@ -1271,7 +1271,7 @@ const Profile = ({state, dispatch, onLogout, onAddVehicle, onNav}) => {
                   <div style={{width:36,height:36,borderRadius:'50%',background:v.color||'#7C6FFF',border:'2px solid rgba(255,255,255,.15)',boxShadow:`0 0 8px ${v.color||'#7C6FFF'}50`,flexShrink:0}}/>
                   <div>
                     <p style={{fontWeight:600,fontSize:14}}>{v.brand} {v.model}</p>
-                    <p style={{fontSize:11,color:'var(--text-3)',marginTop:2}}><span style={{fontFamily:'Space Mono'}}>{v.plate.toUpperCase()}</span> · {Number(v.km).toLocaleString('es-AR')} km</p>
+                    <p style={{fontSize:11,color:'var(--text-3)',marginTop:2}}>{v.plate.toUpperCase()} · {Number(v.km).toLocaleString('es-AR')} km</p>
                   </div>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:8}}>
