@@ -31,19 +31,21 @@ body { font-family: 'DM Sans', sans-serif; background: #F6F6F7; color: #111114; 
   --radius-sm:10px; --radius-md:14px; --radius-lg:20px; --radius-xl:28px;
 }
 input, select {
-  font-family:'DM Sans',sans-serif; background:var(--bg-3); border:1px solid var(--border);
-  color:var(--text-1); border-radius:var(--radius-sm); padding:12px 14px;
-  font-size:14px; width:100%; outline:none; transition:border-color .2s;
+  font-family:'DM Sans',sans-serif; background:var(--bg-1); border:1px solid var(--border);
+  color:var(--text-1); border-radius:var(--radius-lg); padding:13px 16px;
+  font-size:14px; width:100%; outline:none; transition:border-color .2s,box-shadow .2s;
+  box-shadow:0 1px 2px rgba(10,10,12,.04);
 }
-input:focus, select:focus { border-color:var(--accent); }
+input:focus, select:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(17,17,20,.08); }
 input::placeholder { color:var(--text-3); }
-select option { background:var(--bg-2); }
+select option { background:var(--bg-1); }
 textarea {
-  font-family:'DM Sans',sans-serif; background:var(--bg-3); border:1px solid var(--border);
-  color:var(--text-1); border-radius:var(--radius-sm); padding:12px 14px;
-  font-size:14px; width:100%; outline:none; resize:vertical; transition:border-color .2s; display:block;
+  font-family:'DM Sans',sans-serif; background:var(--bg-1); border:1px solid var(--border);
+  color:var(--text-1); border-radius:var(--radius-lg); padding:13px 16px;
+  font-size:14px; width:100%; outline:none; resize:vertical; transition:border-color .2s,box-shadow .2s; display:block;
+  box-shadow:0 1px 2px rgba(10,10,12,.04);
 }
-textarea:focus { border-color:var(--accent); }
+textarea:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(17,17,20,.08); }
 textarea::placeholder { color:var(--text-3); }
 ::-webkit-scrollbar { width:4px; }
 ::-webkit-scrollbar-thumb { background:var(--bg-4); border-radius:2px; }
@@ -268,18 +270,21 @@ const Btn = ({children,onClick,v='primary',sz='md',style={},disabled=false}) => 
   return <button onClick={onClick} disabled={disabled} style={{background:bv.bg,color:bv.color,border:bv.border,padding:bs.p,fontSize:bs.fs,fontWeight:700,fontFamily:'DM Sans,sans-serif',borderRadius:'var(--radius-md)',cursor:disabled?'not-allowed':'pointer',display:'inline-flex',alignItems:'center',gap:6,opacity:disabled?.5:1,transition:'all .15s',whiteSpace:'nowrap',...style}}>{children}</button>;
 };
 const CarSVG = ({c='#2EC864'}) => (
-  <svg viewBox="0 0 220 90" fill="none" style={{width:'100%',maxWidth:220,filter:`drop-shadow(0 8px 28px ${c}35)`}}>
-    <defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={c} stopOpacity=".9"/><stop offset="100%" stopColor={c} stopOpacity=".45"/></linearGradient></defs>
-    <rect x="18" y="42" width="184" height="30" rx="10" fill="url(#cg)"/>
-    <path d="M55 42L75 18h70l20 24Z" fill={c} fillOpacity=".8"/>
-    <rect x="78" y="22" width="26" height="16" rx="3" fill="rgba(200,240,220,.25)"/>
-    <rect x="110" y="22" width="26" height="16" rx="3" fill="rgba(200,240,220,.25)"/>
-    <rect x="18" y="64" width="42" height="7" rx="3" fill={c} fillOpacity=".4"/>
-    <rect x="160" y="64" width="42" height="7" rx="3" fill={c} fillOpacity=".4"/>
-    <circle cx="60" cy="72" r="14" fill="#060A07"/><circle cx="60" cy="72" r="10" fill="#162018"/><circle cx="60" cy="72" r="5" fill={c} fillOpacity=".55"/>
-    <circle cx="160" cy="72" r="14" fill="#060A07"/><circle cx="160" cy="72" r="10" fill="#162018"/><circle cx="160" cy="72" r="5" fill={c} fillOpacity=".55"/>
-    <rect x="22" y="50" width="14" height="7" rx="2" fill="rgba(255,220,80,.6)"/>
-    <rect x="184" y="50" width="14" height="7" rx="2" fill="rgba(232,90,74,.45)"/>
+  <svg viewBox="0 0 240 100" fill="none" style={{width:'100%',maxWidth:240}}>
+    <defs>
+      <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor={c} stopOpacity="1"/>
+        <stop offset="100%" stopColor={c} stopOpacity=".74"/>
+      </linearGradient>
+    </defs>
+    <ellipse cx="120" cy="90" rx="92" ry="6" fill="rgba(0,0,0,.10)"/>
+    <path d="M18 66 Q18 48 38 44 L54 44 Q63 22 88 20 L158 20 Q183 22 192 44 L208 44 Q228 48 228 66 L228 72 Q228 78 222 78 L24 78 Q18 78 18 72 Z" fill="url(#cg)"/>
+    <path d="M64 42 Q71 26 90 24 L156 24 Q175 26 182 42 Z" fill="rgba(255,255,255,.4)"/>
+    <line x1="123" y1="24" x2="123" y2="42" stroke={c} strokeOpacity=".45" strokeWidth="2"/>
+    <rect x="20" y="50" width="13" height="6" rx="2" fill="rgba(255,220,80,.75)"/>
+    <rect x="213" y="50" width="13" height="6" rx="2" fill="rgba(214,69,58,.6)"/>
+    <circle cx="58" cy="78" r="16" fill="#1A1A1E"/><circle cx="58" cy="78" r="10" fill="#3A3A40"/><circle cx="58" cy="78" r="4" fill={c}/>
+    <circle cx="188" cy="78" r="16" fill="#1A1A1E"/><circle cx="188" cy="78" r="10" fill="#3A3A40"/><circle cx="188" cy="78" r="4" fill={c}/>
   </svg>
 );
 const CAR_COLORS = [
@@ -641,7 +646,7 @@ const Dashboard = ({state, dispatch, vehicle, vehicles, onNav}) => {
               <p style={{fontSize:11,color:'var(--text-3)',marginBottom:4}}>Kilometraje actual</p>
               <p style={{fontSize:26,fontWeight:800}}>{Number(vehicle.km).toLocaleString('es-AR')}<span style={{fontSize:14,color:'var(--text-3)',fontWeight:500}}> km</span></p>
             </div>
-            <Btn onClick={()=>{setNewKm('');setKmModal(true);}} v="ghost" sz="sm" style={{alignSelf:'flex-start',marginTop:10}}>Actualizar</Btn>
+            <Btn onClick={()=>{setNewKm('');setKmModal(true);}} sz="md" style={{width:'100%',justifyContent:'center',marginTop:10}}>Actualizar km</Btn>
           </div>
         </div>
       </div>
