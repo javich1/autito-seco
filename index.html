@@ -421,26 +421,20 @@ const MaintDetail = ({m, vehicle, onApply, onBack, onToggleCat, dispatch}) => {
         <h2 style={{fontSize:17,fontWeight:700}}>{m.name}</h2>
       </div>
       <div style={{padding:'24px 20px'}}>
-        <div style={{textAlign:'center',marginBottom:24}}>
-          <div style={{width:72,height:72,borderRadius:22,background:'var(--bg-3)',border:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 12px'}}>
-            <Icon id={m.iconId||'wrench'} size={36} color="var(--green)"/>
+        <div style={{textAlign:'center',marginBottom:20}}>
+          <div style={{position:'relative',width:180,height:180,margin:'0 auto 14px'}}>
+            <Ring pct={s.registered?s.health:0} size={180} stroke={14} color={cMap[s.color]}/>
+            <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:8}}>
+              <Icon id={m.iconId||'wrench'} size={30} color={cMap[s.color]}/>
+              <p style={{fontSize:30,fontWeight:800,color:cMap[s.color]}}>{s.registered?`${pctD}%`:'—'}</p>
+            </div>
           </div>
           <Badge color={s.color} label={s.label}/>
           <p style={{color:'var(--text-2)',fontSize:13,marginTop:10,lineHeight:1.5}}>{m.desc}</p>
+          {nextInfo()&&<p style={{fontSize:12,marginTop:8,fontWeight:600,color:s.pct>=0.6?cMap[s.color]:'var(--text-3)'}}>{nextInfo()}</p>}
           <button onClick={onToggleCat} style={{marginTop:10,background:'none',border:'none',color:'var(--text-3)',fontSize:11,cursor:'pointer',fontFamily:'DM Sans,sans-serif',textDecoration:'underline',textDecorationStyle:'dotted'}}>
             {m.cat==='monthly'?'Mover a Mantenimiento':'Mover a Controles mensuales'}
           </button>
-        </div>
-
-        <div style={{background:'var(--bg-2)',borderRadius:'var(--radius-xl)',padding:'20px 18px',marginBottom:16,border:'1px solid var(--border)'}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-            <p style={{fontSize:12,color:'var(--text-3)'}}>{s.registered?'Estado de salud':'Sin registros aún'}</p>
-            <p style={{fontSize:20,fontWeight:700,color:cMap[s.color]}}>{s.registered?`${pctD}%`:'—'}</p>
-          </div>
-          <div style={{height:12,background:'var(--bg-4)',borderRadius:99,overflow:'hidden',marginBottom:10}}>
-            <div style={{height:'100%',width:`${pctD}%`,background:cMap[s.color],borderRadius:99,boxShadow:`0 0 12px ${cMap[s.color]}50`,transition:'width .6s'}}/>
-          </div>
-          {nextInfo()&&<p style={{fontSize:12,color:s.pct>=0.6?cMap[s.color]:'var(--text-3)'}}>{nextInfo()}</p>}
         </div>
 
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:18}}>
