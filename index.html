@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Autito Seco</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#2EC864">
+<meta name="theme-color" content="#F6F6F7">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -18,16 +18,16 @@
 <script src="https://unpkg.com/@supabase/supabase-js@2.49.4/dist/umd/supabase.js" integrity="sha384-rwykjmWNwVxboyFmvK9OXN0wj9hnMHA2aAHtits54DuACyCq0M2PrSNxhRb+hvXT" crossorigin="anonymous"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'DM Sans', sans-serif; background: #060A07; color: #EFF5F0; min-height: 100vh; }
+body { font-family: 'DM Sans', sans-serif; background: #F6F6F7; color: #111114; min-height: 100vh; }
 :root {
-  --bg-0:#060A07; --bg-1:#0B110C; --bg-2:#101814; --bg-3:#162018; --bg-4:#1C281E; --bg-5:#223025;
-  --text-1:#EFF5F0; --text-2:#94A896; --text-3:#4D6450;
-  --green:#2EC864; --green-400:#4AE880; --green-600:#1FA84E; --green-dim:#0A2010; --green-mid:#122818;
-  --amber:#E8C84A; --amber-dim:#201800;
-  --red:#E85A4A;   --red-dim:#200A08;
-  --blue:#4A9AE8;  --blue-dim:#081428;
-  --accent:#2EC864; --accent-dim:#0A2010;
-  --border:rgba(46,200,100,0.1); --border-hover:rgba(46,200,100,0.22);
+  --bg-0:#F6F6F7; --bg-1:#FFFFFF; --bg-2:#FFFFFF; --bg-3:#F1F1F3; --bg-4:#E5E5E9; --bg-5:#D6D6DB;
+  --text-1:#111114; --text-2:#6E6E76; --text-3:#A2A2A9;
+  --green:#1FA84E; --green-400:#2EC864; --green-600:#168A3E; --green-dim:#E7F7EC; --green-mid:#D3F0DD;
+  --amber:#B8860B; --amber-dim:#FBF1D8;
+  --red:#D6453A;   --red-dim:#FCEAE8;
+  --blue:#2F7DD1;  --blue-dim:#E9F2FB;
+  --accent:#111114; --accent-dim:#EFEFF1;
+  --border:rgba(10,10,12,0.08); --border-hover:rgba(10,10,12,0.18);
   --radius-sm:10px; --radius-md:14px; --radius-lg:20px; --radius-xl:28px;
 }
 input, select {
@@ -247,7 +247,7 @@ const Badge = ({color,label}) => (
 );
 const Bar = ({health, color}) => (
   <div style={{height:5,background:'var(--bg-4)',borderRadius:99,overflow:'hidden'}}>
-    <div style={{height:'100%',width:`${Math.min(Math.round(health*100),100)}%`,background:cMap[color],borderRadius:99,boxShadow:`0 0 8px ${cMap[color]}50`,transition:'width .5s'}}/>
+    <div style={{height:'100%',width:`${Math.min(Math.round(health*100),100)}%`,background:cMap[color],borderRadius:99,transition:'width .5s'}}/>
   </div>
 );
 const Ring = ({pct, size=120, stroke=11, color}) => {
@@ -258,12 +258,12 @@ const Ring = ({pct, size=120, stroke=11, color}) => {
       <circle cx={size/2} cy={size/2} r={r} stroke="var(--bg-4)" strokeWidth={stroke} fill="none"/>
       <circle cx={size/2} cy={size/2} r={r} stroke={color} strokeWidth={stroke} fill="none" strokeLinecap="round"
         strokeDasharray={c} strokeDashoffset={c*(1-clamped)} transform={`rotate(-90 ${size/2} ${size/2})`}
-        style={{transition:'stroke-dashoffset .6s ease', filter:`drop-shadow(0 0 6px ${color}60)`}}/>
+        style={{transition:'stroke-dashoffset .6s ease'}}/>
     </svg>
   );
 };
 const Btn = ({children,onClick,v='primary',sz='md',style={},disabled=false}) => {
-  const bv={primary:{bg:'var(--accent)',color:'#060A07',border:'none'},secondary:{bg:'var(--bg-3)',color:'var(--text-1)',border:'1px solid var(--border)'},ghost:{bg:'transparent',color:'var(--text-2)',border:'1px solid var(--border)'},danger:{bg:'var(--red-dim)',color:'var(--red)',border:'1px solid rgba(232,90,74,.2)'},success:{bg:'var(--green-dim)',color:'var(--green)',border:'1px solid rgba(46,200,100,.2)'}}[v];
+  const bv={primary:{bg:'var(--accent)',color:'#FFFFFF',border:'none'},secondary:{bg:'var(--bg-3)',color:'var(--text-1)',border:'1px solid var(--border)'},ghost:{bg:'transparent',color:'var(--text-2)',border:'1px solid var(--border)'},danger:{bg:'var(--red-dim)',color:'var(--red)',border:'1px solid rgba(214,69,58,.2)'},success:{bg:'var(--green-dim)',color:'var(--green)',border:'1px solid rgba(31,168,78,.2)'}}[v];
   const bs={sm:{p:'7px 14px',fs:'12px'},md:{p:'10px 18px',fs:'14px'},lg:{p:'14px 26px',fs:'15px'}}[sz];
   return <button onClick={onClick} disabled={disabled} style={{background:bv.bg,color:bv.color,border:bv.border,padding:bs.p,fontSize:bs.fs,fontWeight:700,fontFamily:'DM Sans,sans-serif',borderRadius:'var(--radius-md)',cursor:disabled?'not-allowed':'pointer',display:'inline-flex',alignItems:'center',gap:6,opacity:disabled?.5:1,transition:'all .15s',whiteSpace:'nowrap',...style}}>{children}</button>;
 };
@@ -293,7 +293,7 @@ const ColorPicker = ({value,onChange}) => (
     <label style={{fontSize:12,color:'var(--text-3)',display:'block',marginBottom:8,fontWeight:500}}>Color del vehículo</label>
     <div style={{display:'grid',gridTemplateColumns:'repeat(8,1fr)',gap:8}}>
       {CAR_COLORS.map(c=>(
-        <button key={c.hex} title={c.name} onClick={()=>onChange(c.hex)} style={{width:'100%',aspectRatio:'1',borderRadius:'50%',background:c.hex,border:value===c.hex?'3px solid var(--accent)':'2px solid rgba(255,255,255,0.1)',cursor:'pointer',transition:'transform .15s',transform:value===c.hex?'scale(1.2)':'scale(1)',boxShadow:value===c.hex?`0 0 10px ${c.hex}80`:'none'}}/>
+        <button key={c.hex} title={c.name} onClick={()=>onChange(c.hex)} style={{width:'100%',aspectRatio:'1',borderRadius:'50%',background:c.hex,border:value===c.hex?'3px solid var(--accent)':'2px solid rgba(0,0,0,.12)',cursor:'pointer',transition:'transform .15s',transform:value===c.hex?'scale(1.2)':'scale(1)',boxShadow:value===c.hex?`0 0 10px ${c.hex}80`:'none'}}/>
       ))}
     </div>
     {value&&<p style={{fontSize:11,color:'var(--text-3)',marginTop:8}}>Seleccionado: {CAR_COLORS.find(c=>c.hex===value)?.name||value}</p>}
@@ -361,7 +361,7 @@ const Login = ({onLogin}) => {
   return (
     <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px 20px'}}>
       <div style={{textAlign:'center',marginBottom:36}}>
-        <div style={{width:56,height:56,borderRadius:16,background:'var(--accent-dim)',border:'1px solid rgba(46,200,100,.3)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 14px'}}>
+        <div style={{width:56,height:56,borderRadius:16,background:'var(--green-dim)',border:'1px solid rgba(31,168,78,.3)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 14px'}}>
           <Icon id="car" size={28} color="var(--green)"/>
         </div>
         <h1 style={{fontFamily:'DM Sans',fontSize:26,fontWeight:800,letterSpacing:'-.02em'}}>Autito Seco</h1>
@@ -457,7 +457,7 @@ const MaintDetail = ({m, vehicle, onApply, onBack, onToggleCat, dispatch}) => {
           </div>
         )}
 
-        {m.tip&&<div style={{background:'var(--accent-dim)',border:'1px solid rgba(46,200,100,.15)',borderRadius:'var(--radius-md)',padding:'12px 14px',marginBottom:18}}><p style={{fontSize:12,color:'rgba(100,220,140,.9)',lineHeight:1.5}}>💡 {m.tip}</p></div>}
+        {m.tip&&<div style={{background:'var(--green-dim)',border:'1px solid rgba(31,168,78,.15)',borderRadius:'var(--radius-md)',padding:'12px 14px',marginBottom:18}}><p style={{fontSize:12,color:'var(--green-600)',lineHeight:1.5}}>💡 {m.tip}</p></div>}
 
         <div style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-xl)',padding:'20px',marginBottom:12}}>
           <p style={{fontSize:13,fontWeight:700,marginBottom:16}}>Registrar revisión</p>
@@ -471,7 +471,7 @@ const MaintDetail = ({m, vehicle, onApply, onBack, onToggleCat, dispatch}) => {
             <label style={{fontSize:12,color:'var(--text-3)',display:'block',marginBottom:6}}>KM al momento de la revisión</label>
             <input type="number" value={customKm} onChange={e=>setCustomKm(e.target.value)} placeholder={vehicle.km?`KM actual: ${Number(vehicle.km).toLocaleString('es-AR')}`:'Ingresá los km'}/>
             {kmHigher&&(
-              <div style={{background:'var(--amber-dim)',border:'1px solid rgba(232,200,74,.2)',borderRadius:'var(--radius-md)',padding:'10px 14px',marginTop:8,display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
+              <div style={{background:'var(--amber-dim)',border:'1px solid rgba(184,134,11,.2)',borderRadius:'var(--radius-md)',padding:'10px 14px',marginTop:8,display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
                 <p style={{fontSize:12,color:'var(--amber)',lineHeight:1.4}}>El KM ingresado es mayor al registrado. ¿Actualizás el odómetro también?</p>
                 <button onClick={()=>dispatch({type:'UPD_KM',vid:vehicle.id,km:Number(customKm)})} style={{background:'var(--amber)',color:'#060A07',border:'none',borderRadius:'var(--radius-sm)',padding:'6px 12px',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'DM Sans,sans-serif',whiteSpace:'nowrap',flexShrink:0}}>Actualizar</button>
               </div>
@@ -653,7 +653,7 @@ const Dashboard = ({state, dispatch, vehicle, vehicles, onNav}) => {
         if (!due.length) return null;
         const urgentCount = due.filter(m=>getStatus(m,vehicle.km).pct>=0.8).length;
         return (
-          <div style={{margin:'16px 16px 0',background:urgentCount?'var(--red-dim)':'var(--amber-dim)',border:`1px solid ${urgentCount?'rgba(232,90,74,.25)':'rgba(232,200,74,.25)'}`,borderRadius:'var(--radius-lg)',padding:'14px 16px'}}>
+          <div style={{margin:'16px 16px 0',background:urgentCount?'var(--red-dim)':'var(--amber-dim)',border:`1px solid ${urgentCount?'rgba(214,69,58,.25)':'rgba(184,134,11,.25)'}`,borderRadius:'var(--radius-lg)',padding:'14px 16px'}}>
             <p style={{fontSize:12,fontWeight:700,color:urgentCount?'var(--red)':'var(--amber)',marginBottom:8}}>
               {urgentCount?`⚠ ${urgentCount} ítem${urgentCount>1?'s':''} requiere${urgentCount>1?'n':''} atención`:`${due.length} ítem${due.length>1?'s':''} próximo${due.length>1?'s':''} a vencer`}
             </p>
@@ -712,8 +712,8 @@ const Dashboard = ({state, dispatch, vehicle, vehicles, onNav}) => {
             {vehicles.map(v=>{
               const isCur=v.id===vehicle.id;
               return (
-                <div key={v.id} onClick={()=>{ dispatch({type:'SET_FAV',id:v.id}); setVcModal(false); }} style={{background:isCur?'var(--accent-dim)':'var(--bg-3)',border:`1px solid ${isCur?'rgba(124,111,255,.35)':'var(--border)'}`,borderRadius:'var(--radius-lg)',padding:'14px 16px',marginBottom:10,cursor:'pointer',display:'flex',alignItems:'center',gap:12}}>
-                  <div style={{width:36,height:36,borderRadius:'50%',background:v.color||'#7C6FFF',border:'2px solid rgba(255,255,255,.15)',flexShrink:0}}/>
+                <div key={v.id} onClick={()=>{ dispatch({type:'SET_FAV',id:v.id}); setVcModal(false); }} style={{background:isCur?'var(--accent-dim)':'var(--bg-3)',border:`1px solid ${isCur?'rgba(17,17,20,.35)':'var(--border)'}`,borderRadius:'var(--radius-lg)',padding:'14px 16px',marginBottom:10,cursor:'pointer',display:'flex',alignItems:'center',gap:12}}>
+                  <div style={{width:36,height:36,borderRadius:'50%',background:v.color||'#7C6FFF',border:'2px solid rgba(0,0,0,.12)',flexShrink:0}}/>
                   <div style={{flex:1}}>
                     <p style={{fontWeight:600,fontSize:14}}>{v.brand} {v.model}</p>
                     <p style={{fontSize:11,color:'var(--text-3)',marginTop:2}}>{v.plate.toUpperCase()} · {Number(v.km).toLocaleString('es-AR')} km</p>
@@ -812,7 +812,7 @@ const Documents = ({state, dispatch}) => {
               const expired=doc.date&&new Date(doc.date)<new Date();
               const near=doc.date&&!expired&&(new Date(doc.date)-new Date())<30*864e5;
               return (
-                <div key={doc.id} style={{background:'var(--bg-2)',border:`1px solid ${expired?'rgba(255,85,85,.25)':near?'rgba(245,166,35,.25)':'var(--border)'}`,borderRadius:'var(--radius-lg)',padding:'14px 16px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <div key={doc.id} style={{background:'var(--bg-2)',border:`1px solid ${expired?'rgba(214,69,58,.25)':near?'rgba(184,134,11,.25)':'var(--border)'}`,borderRadius:'var(--radius-lg)',padding:'14px 16px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                   <div style={{display:'flex',gap:12,alignItems:'center'}}>
                     <span style={{fontSize:24}}>{icons[doc.type]}</span>
                     <div>
@@ -886,14 +886,14 @@ const Workshop = ({state, dispatch, vehicle}) => {
           </div>
           <div style={{display:'flex',gap:8}}>
             <button onClick={()=>setMode('edit')} style={{background:'var(--bg-3)',border:'1px solid var(--border)',color:'var(--text-2)',borderRadius:'var(--radius-sm)',padding:'6px 12px',fontSize:12,fontWeight:600,cursor:'pointer'}}>✏ Editar</button>
-            <button onClick={()=>{ dispatch({type:'DEL_WORK',id:e.id}); setMode('list'); }} style={{background:'var(--red-dim)',border:'1px solid rgba(255,85,85,.2)',color:'var(--red)',borderRadius:'var(--radius-sm)',padding:'6px 12px',fontSize:12,fontWeight:600,cursor:'pointer'}}>Eliminar</button>
+            <button onClick={()=>{ dispatch({type:'DEL_WORK',id:e.id}); setMode('list'); }} style={{background:'var(--red-dim)',border:'1px solid rgba(214,69,58,.2)',color:'var(--red)',borderRadius:'var(--radius-sm)',padding:'6px 12px',fontSize:12,fontWeight:600,cursor:'pointer'}}>Eliminar</button>
           </div>
         </div>
         <div style={{padding:'24px 20px'}}>
           {/* Lugar, fecha y contacto */}
           <div style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-xl)',padding:'20px',marginBottom:16}}>
             <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:16}}>
-              <div style={{width:44,height:44,background:'var(--accent-dim)',border:'1px solid rgba(124,111,255,.25)',borderRadius:'var(--radius-md)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,flexShrink:0}}>🔩</div>
+              <div style={{width:44,height:44,background:'var(--accent-dim)',border:'1px solid rgba(17,17,20,.25)',borderRadius:'var(--radius-md)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,flexShrink:0}}>🔩</div>
               <div>
                 <p style={{fontWeight:700,fontSize:16}}>{e.place}</p>
                 <p style={{fontSize:13,color:'var(--text-2)',marginTop:2}}>{new Date(e.date+'T12:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'long',year:'numeric'})}</p>
@@ -918,7 +918,7 @@ const Workshop = ({state, dispatch, vehicle}) => {
           {e.result&&<div style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-xl)',padding:'20px',marginBottom:16}}><p style={{fontSize:11,color:'var(--text-3)',marginBottom:8,fontWeight:600,letterSpacing:'.05em',textTransform:'uppercase'}}>Resultado / Observaciones</p><p style={{fontSize:14,color:'var(--text-1)',lineHeight:1.6}}>{e.result}</p></div>}
 
           {/* Costo */}
-          {e.cost&&<div style={{background:'var(--green-dim)',border:'1px solid rgba(46,232,154,.15)',borderRadius:'var(--radius-xl)',padding:'20px'}}><p style={{fontSize:11,color:'rgba(46,232,154,.6)',marginBottom:6,fontWeight:600,letterSpacing:'.05em',textTransform:'uppercase'}}>Costo total</p><p style={{fontSize:26,fontWeight:700,color:'var(--green)'}}>{fmt(e.cost)}</p></div>}
+          {e.cost&&<div style={{background:'var(--green-dim)',border:'1px solid rgba(31,168,78,.15)',borderRadius:'var(--radius-xl)',padding:'20px'}}><p style={{fontSize:11,color:'var(--green-600)',marginBottom:6,fontWeight:600,letterSpacing:'.05em',textTransform:'uppercase'}}>Costo total</p><p style={{fontSize:26,fontWeight:700,color:'var(--green)'}}>{fmt(e.cost)}</p></div>}
         </div>
       </div>
     );
@@ -948,7 +948,7 @@ const Workshop = ({state, dispatch, vehicle}) => {
               <div key={e.id} onClick={()=>{ setSelId(e.id); setMode('detail'); }} style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-lg)',padding:'16px',cursor:'pointer',transition:'all .15s'}} onMouseOver={ev=>{ev.currentTarget.style.background='var(--bg-3)';ev.currentTarget.style.borderColor='var(--border-hover)';}} onMouseOut={ev=>{ev.currentTarget.style.background='var(--bg-2)';ev.currentTarget.style.borderColor='var(--border)';}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
                   <div style={{display:'flex',gap:12,alignItems:'center'}}>
-                    <div style={{width:40,height:40,background:'var(--accent-dim)',border:'1px solid rgba(124,111,255,.2)',borderRadius:'var(--radius-md)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0}}>🔩</div>
+                    <div style={{width:40,height:40,background:'var(--accent-dim)',border:'1px solid rgba(17,17,20,.2)',borderRadius:'var(--radius-md)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0}}>🔩</div>
                     <div>
                       <p style={{fontWeight:700,fontSize:14}}>{e.place}</p>
                       <p style={{fontSize:11,color:'var(--text-3)',marginTop:2}}>{new Date(e.date+'T12:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'short',year:'numeric'})}{e.person&&` · ${e.person}`}</p>
@@ -993,13 +993,13 @@ const FAQScreen = ({onBack}) => {
         </div>
       </div>
       <div style={{padding:'20px 16px'}}>
-        <div style={{background:'var(--accent-dim)',border:'1px solid rgba(124,111,255,.2)',borderRadius:'var(--radius-lg)',padding:'14px 16px',marginBottom:20,display:'flex',gap:10,alignItems:'flex-start'}}>
+        <div style={{background:'var(--accent-dim)',border:'1px solid rgba(17,17,20,.2)',borderRadius:'var(--radius-lg)',padding:'14px 16px',marginBottom:20,display:'flex',gap:10,alignItems:'flex-start'}}>
           <span style={{fontSize:20,flexShrink:0}}>🚗</span>
-          <p style={{fontSize:13,color:'rgba(200,195,255,.9)',lineHeight:1.5}}>Autito Seco es tu historial clínico de vehículo. Registrá mantenimientos, visitás al taller y llevá el control de todo en un solo lugar.</p>
+          <p style={{fontSize:13,color:'var(--text-2)',lineHeight:1.5}}>Autito Seco es tu historial clínico de vehículo. Registrá mantenimientos, visitás al taller y llevá el control de todo en un solo lugar.</p>
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
           {FAQ_ITEMS.map((item,i)=>(
-            <div key={i} style={{background:'var(--bg-2)',border:`1px solid ${open===i?'rgba(124,111,255,.3)':'var(--border)'}`,borderRadius:'var(--radius-lg)',overflow:'hidden',transition:'border-color .2s'}}>
+            <div key={i} style={{background:'var(--bg-2)',border:`1px solid ${open===i?'rgba(17,17,20,.3)':'var(--border)'}`,borderRadius:'var(--radius-lg)',overflow:'hidden',transition:'border-color .2s'}}>
               <button onClick={()=>setOpen(open===i?null:i)} style={{width:'100%',background:'none',border:'none',padding:'14px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer',gap:12}}>
                 <span style={{fontSize:13,fontWeight:600,color:'var(--text-1)',textAlign:'left',lineHeight:1.3}}>{item.q}</span>
                 <span style={{fontSize:16,color:'var(--text-3)',flexShrink:0,transition:'transform .2s',transform:open===i?'rotate(180deg)':'rotate(0deg)'}}>⌄</span>
@@ -1030,7 +1030,7 @@ const IntervalsScreen = ({vehicle, dispatch, onBack}) => {
     const [trig, setTrig] = useState(m.trigger);
     const save=()=>{ dispatch({type:'UPD_MAINT_INTERVAL',vid:vehicle.id,mid:m.id,changes:{iKm:iKm?Number(iKm):null,iDays:iDays?Number(iDays):null,trigger:trig}}); setEditId(null); };
     return (
-      <div style={{background:'var(--bg-2)',border:`1px solid ${isEditing?'rgba(124,111,255,.3)':'var(--border)'}`,borderRadius:'var(--radius-lg)',marginBottom:10,overflow:'hidden'}}>
+      <div style={{background:'var(--bg-2)',border:`1px solid ${isEditing?'rgba(17,17,20,.3)':'var(--border)'}`,borderRadius:'var(--radius-lg)',marginBottom:10,overflow:'hidden'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px'}}>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
             <Icon id={m.iconId||'wrench'} size={20} color="var(--green)"/>
@@ -1161,7 +1161,7 @@ const VehicleDetailScreen = ({vehicle, isFav, dispatch, onBack, onGoToDashboard,
               <div key={l} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
                 <span style={{fontSize:13,color:'var(--text-3)'}}>{l}</span>
                 <div style={{display:'flex',alignItems:'center',gap:8}}>
-                  {l==='Color'&&vehicle.color&&<div style={{width:14,height:14,borderRadius:'50%',background:vehicle.color,border:'1px solid rgba(255,255,255,.2)'}}/>}
+                  {l==='Color'&&vehicle.color&&<div style={{width:14,height:14,borderRadius:'50%',background:vehicle.color,border:'1px solid rgba(0,0,0,.15)'}}/>}
                   <span style={{fontSize:13,fontWeight:700}}>{v}</span>
                 </div>
               </div>
@@ -1186,7 +1186,7 @@ const VehicleDetailScreen = ({vehicle, isFav, dispatch, onBack, onGoToDashboard,
         </Btn>
 
         {confirmDel ? (
-          <div style={{background:'var(--red-dim)',border:'1px solid rgba(232,90,74,.25)',borderRadius:'var(--radius-xl)',padding:'18px'}}>
+          <div style={{background:'var(--red-dim)',border:'1px solid rgba(214,69,58,.25)',borderRadius:'var(--radius-xl)',padding:'18px'}}>
             <p style={{fontSize:13,color:'var(--red)',fontWeight:600,marginBottom:4}}>¿Eliminar {vehicle.brand} {vehicle.model}?</p>
             <p style={{fontSize:12,color:'var(--text-2)',marginBottom:14}}>Se borra también su historial y las visitas al taller. No se puede deshacer.</p>
             <div style={{display:'flex',gap:10}}>
@@ -1258,11 +1258,11 @@ const Profile = ({state, dispatch, onLogout, onAddVehicle, onNav}) => {
             const vov=overallStatus(v.maints,v.km);
             return (
               <div key={v.id} onClick={()=>setSubScreen({type:'vehicle',id:v.id})}
-                style={{background:'var(--bg-3)',border:`1px solid ${isFav?'rgba(124,111,255,.35)':'var(--border)'}`,borderRadius:'var(--radius-lg)',padding:'14px 16px',marginBottom:10,display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer',transition:'all .15s'}}
+                style={{background:'var(--bg-3)',border:`1px solid ${isFav?'rgba(17,17,20,.35)':'var(--border)'}`,borderRadius:'var(--radius-lg)',padding:'14px 16px',marginBottom:10,display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer',transition:'all .15s'}}
                 onMouseOver={e=>{e.currentTarget.style.background='var(--bg-4)';}}
                 onMouseOut={e=>{e.currentTarget.style.background='var(--bg-3)';}}>
                 <div style={{display:'flex',alignItems:'center',gap:12}}>
-                  <div style={{width:36,height:36,borderRadius:'50%',background:v.color||'#7C6FFF',border:'2px solid rgba(255,255,255,.15)',boxShadow:`0 0 8px ${v.color||'#7C6FFF'}50`,flexShrink:0}}/>
+                  <div style={{width:36,height:36,borderRadius:'50%',background:v.color||'#7C6FFF',border:'2px solid rgba(0,0,0,.12)',boxShadow:`0 0 8px ${v.color||'#7C6FFF'}50`,flexShrink:0}}/>
                   <div>
                     <p style={{fontWeight:600,fontSize:14}}>{v.brand} {v.model}</p>
                     <p style={{fontSize:11,color:'var(--text-3)',marginTop:2}}>{v.plate.toUpperCase()} · {Number(v.km).toLocaleString('es-AR')} km</p>
@@ -1299,7 +1299,7 @@ const Nav = ({active,onNav}) => {
     { id:'profile',  iconId:'user',   l:'Perfil' },
   ];
   return (
-    <div style={{position:'fixed',bottom:0,left:0,right:0,background:'rgba(11,17,12,0.96)',borderTop:'1px solid var(--border)',display:'flex',zIndex:50,backdropFilter:'blur(12px)'}}>
+    <div style={{position:'fixed',bottom:0,left:0,right:0,background:'rgba(255,255,255,0.92)',borderTop:'1px solid var(--border)',display:'flex',zIndex:50,backdropFilter:'blur(12px)'}}>
       {items.map(it=>(
         <button key={it.id} onClick={()=>onNav(it.id)} style={{flex:1,background:'none',border:'none',cursor:'pointer',padding:'10px 4px 12px',display:'flex',flexDirection:'column',alignItems:'center',gap:3}}>
           <Icon id={it.iconId} size={20} color={active===it.id?'var(--green)':'var(--text-3)'}/>
@@ -1468,7 +1468,7 @@ const App = () => {
   const StatusBanners = () => (
     <>
       {!online && (
-        <div style={{position:'fixed',top:0,left:0,right:0,zIndex:200,background:'var(--amber-dim)',borderBottom:'1px solid rgba(232,200,74,.25)',color:'var(--amber)',fontSize:12,fontWeight:600,textAlign:'center',padding:'8px 12px'}}>
+        <div style={{position:'fixed',top:0,left:0,right:0,zIndex:200,background:'var(--amber-dim)',borderBottom:'1px solid rgba(184,134,11,.25)',color:'var(--amber)',fontSize:12,fontWeight:600,textAlign:'center',padding:'8px 12px'}}>
           Sin conexión — los cambios se van a guardar cuando vuelva internet
         </div>
       )}
@@ -1478,7 +1478,7 @@ const App = () => {
         </div>
       )}
       {toast && (
-        <div style={{position:'fixed',bottom:90,left:16,right:16,zIndex:200,background:'var(--red-dim)',border:'1px solid rgba(232,90,74,.25)',color:'var(--red)',fontSize:13,fontWeight:600,textAlign:'center',padding:'12px 16px',borderRadius:'var(--radius-lg)'}}>
+        <div style={{position:'fixed',bottom:90,left:16,right:16,zIndex:200,background:'var(--red-dim)',border:'1px solid rgba(214,69,58,.25)',color:'var(--red)',fontSize:13,fontWeight:600,textAlign:'center',padding:'12px 16px',borderRadius:'var(--radius-lg)'}}>
           {toast}
         </div>
       )}
