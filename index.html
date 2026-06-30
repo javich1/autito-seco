@@ -370,7 +370,7 @@ const Login = ({onLogin}) => {
       <div style={{background:'var(--bg-2)',border:'1px solid var(--border)',borderRadius:'var(--radius-xl)',padding:'28px 24px',width:'100%',maxWidth:360}}>
         <div style={{display:'flex',background:'var(--bg-3)',borderRadius:'var(--radius-md)',padding:4,marginBottom:22}}>
           {['login','register'].map(m=>(
-            <button key={m} onClick={()=>{setMode(m);setError('');setInfo('');}} style={{flex:1,padding:'8px',border:'none',borderRadius:'var(--radius-sm)',background:mode===m?'var(--accent)':'transparent',color:mode===m?'#fff':'var(--text-2)',fontFamily:'Sora,sans-serif',fontSize:13,fontWeight:500,cursor:'pointer',transition:'all .2s'}}>
+            <button key={m} onClick={()=>{setMode(m);setError('');setInfo('');}} style={{flex:1,padding:'8px',border:'none',borderRadius:'var(--radius-sm)',background:mode===m?'var(--accent)':'transparent',color:mode===m?'#fff':'var(--text-2)',fontSize:13,fontWeight:500,cursor:'pointer',transition:'all .2s'}}>
               {m==='login'?'Ingresar':'Registrarse'}
             </button>
           ))}
@@ -622,7 +622,7 @@ const Dashboard = ({state, dispatch, vehicle, vehicles, onNav}) => {
             <p style={{fontSize:11,color:'var(--text-3)',letterSpacing:'.08em',textTransform:'uppercase',fontWeight:600,marginBottom:6}}>Mi vehículo</p>
             <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
               <h1 style={{fontSize:30,fontWeight:800,letterSpacing:'-.02em',lineHeight:1.05}}>{vehicle.brand} {vehicle.model}</h1>
-              {vehicles.length>1&&<button onClick={()=>setVcModal(true)} style={{background:'var(--bg-3)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text-3)',fontSize:11,padding:'2px 7px',cursor:'pointer',fontFamily:'Sora,sans-serif'}}>Cambiar auto ↕</button>}
+              {vehicles.length>1&&<button onClick={()=>setVcModal(true)} style={{background:'var(--bg-3)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text-3)',fontSize:11,padding:'2px 7px',cursor:'pointer'}}>Cambiar auto ↕</button>}
             </div>
             <p style={{fontSize:13,color:'var(--text-2)',marginTop:6}}>
               <span style={{background:'var(--bg-3)',padding:'2px 8px',borderRadius:6,fontSize:12,marginRight:8}}>{vehicle.plate.toUpperCase()}</span>
@@ -680,7 +680,7 @@ const Dashboard = ({state, dispatch, vehicle, vehicles, onNav}) => {
         <div style={{display:'flex',justifyContent:'flex-end',marginBottom:14}}>
           <div style={{display:'flex',background:'var(--bg-3)',borderRadius:'var(--radius-sm)',padding:3,gap:2}}>
             {[['list','☰ Lista'],['grid','⊞ Grilla']].map(([id,label])=>(
-              <button key={id} onClick={()=>dispatch({type:'SET_DASH_VIEW',view:id})} style={{background:view===id?'var(--accent)':'transparent',color:view===id?'#fff':'var(--text-2)',border:'none',borderRadius:'var(--radius-sm)',padding:'5px 12px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'Sora,sans-serif',transition:'all .15s'}}>{label}</button>
+              <button key={id} onClick={()=>dispatch({type:'SET_DASH_VIEW',view:id})} style={{background:view===id?'var(--accent)':'transparent',color:view===id?'#fff':'var(--text-2)',border:'none',borderRadius:'var(--radius-sm)',padding:'5px 12px',fontSize:11,fontWeight:600,cursor:'pointer',transition:'all .15s'}}>{label}</button>
             ))}
           </div>
         </div>
@@ -891,8 +891,8 @@ const Workshop = ({state, dispatch, vehicle}) => {
             <h2 style={{fontSize:17,fontWeight:600}}>Visita al taller</h2>
           </div>
           <div style={{display:'flex',gap:8}}>
-            <button onClick={()=>setMode('edit')} style={{background:'var(--bg-3)',border:'1px solid var(--border)',color:'var(--text-2)',borderRadius:'var(--radius-sm)',padding:'6px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'Sora,sans-serif'}}>✏ Editar</button>
-            <button onClick={()=>{ dispatch({type:'DEL_WORK',id:e.id}); setMode('list'); }} style={{background:'var(--red-dim)',border:'1px solid rgba(255,85,85,.2)',color:'var(--red)',borderRadius:'var(--radius-sm)',padding:'6px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'Sora,sans-serif'}}>Eliminar</button>
+            <button onClick={()=>setMode('edit')} style={{background:'var(--bg-3)',border:'1px solid var(--border)',color:'var(--text-2)',borderRadius:'var(--radius-sm)',padding:'6px 12px',fontSize:12,fontWeight:600,cursor:'pointer'}}>✏ Editar</button>
+            <button onClick={()=>{ dispatch({type:'DEL_WORK',id:e.id}); setMode('list'); }} style={{background:'var(--red-dim)',border:'1px solid rgba(255,85,85,.2)',color:'var(--red)',borderRadius:'var(--radius-sm)',padding:'6px 12px',fontSize:12,fontWeight:600,cursor:'pointer'}}>Eliminar</button>
           </div>
         </div>
         <div style={{padding:'24px 20px'}}>
@@ -1051,7 +1051,7 @@ const IntervalsScreen = ({vehicle, dispatch, onBack}) => {
               </p>
             </div>
           </div>
-          <button onClick={()=>setEditId(isEditing?null:m.id)} style={{background:isEditing?'var(--accent)':'var(--bg-3)',border:'none',borderRadius:'var(--radius-sm)',color:isEditing?'#fff':'var(--text-2)',fontSize:11,fontWeight:600,cursor:'pointer',padding:'5px 12px',fontFamily:'Sora,sans-serif',transition:'all .2s'}}>
+          <button onClick={()=>setEditId(isEditing?null:m.id)} style={{background:isEditing?'var(--accent)':'var(--bg-3)',border:'none',borderRadius:'var(--radius-sm)',color:isEditing?'#fff':'var(--text-2)',fontSize:11,fontWeight:600,cursor:'pointer',padding:'5px 12px',transition:'all .2s'}}>
             {isEditing?'✕':'Editar'}
           </button>
         </div>
@@ -1071,7 +1071,7 @@ const IntervalsScreen = ({vehicle, dispatch, onBack}) => {
               <label style={{fontSize:11,color:'var(--text-3)',display:'block',marginBottom:6}}>Disparador de alerta</label>
               <div style={{display:'flex',gap:6}}>
                 {[['both','El primero'],['km','Solo KM'],['time','Solo días']].map(([val,lbl])=>(
-                  <button key={val} onClick={()=>setTrig(val)} style={{flex:1,padding:'7px 4px',fontSize:11,fontWeight:600,fontFamily:'Sora,sans-serif',borderRadius:'var(--radius-sm)',border:'none',cursor:'pointer',background:trig===val?'var(--accent)':'var(--bg-3)',color:trig===val?'#fff':'var(--text-2)',transition:'all .15s'}}>{lbl}</button>
+                  <button key={val} onClick={()=>setTrig(val)} style={{flex:1,padding:'7px 4px',fontSize:11,fontWeight:600,borderRadius:'var(--radius-sm)',border:'none',cursor:'pointer',background:trig===val?'var(--accent)':'var(--bg-3)',color:trig===val?'#fff':'var(--text-2)',transition:'all .15s'}}>{lbl}</button>
                 ))}
               </div>
             </div>
@@ -1135,8 +1135,8 @@ const VehicleDetailScreen = ({vehicle, isFav, dispatch, onBack, onGoToDashboard,
           <h2 style={{fontSize:17,fontWeight:600}}>{vehicle.brand} {vehicle.model}</h2>
         </div>
         <div style={{display:'flex',gap:8,alignItems:'center'}}>
-          {isFav?<span style={{fontSize:18}}>⭐</span>:<button onClick={()=>dispatch({type:'SET_FAV',id:vehicle.id})} style={{background:'var(--bg-3)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',color:'var(--text-2)',fontSize:12,fontWeight:600,padding:'5px 10px',cursor:'pointer',fontFamily:'Sora,sans-serif'}}>☆ Marcar favorito</button>}
-          {!editing&&<button onClick={()=>{setF({brand:vehicle.brand,model:vehicle.model,year:String(vehicle.year),plate:vehicle.plate,color:vehicle.color});setEditing(true);}} style={{background:'var(--bg-3)',border:'1px solid var(--border)',color:'var(--text-2)',borderRadius:'var(--radius-sm)',padding:'6px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'Sora,sans-serif'}}>✏ Editar</button>}
+          {isFav?<span style={{fontSize:18}}>⭐</span>:<button onClick={()=>dispatch({type:'SET_FAV',id:vehicle.id})} style={{background:'var(--bg-3)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',color:'var(--text-2)',fontSize:12,fontWeight:600,padding:'5px 10px',cursor:'pointer'}}>☆ Marcar favorito</button>}
+          {!editing&&<button onClick={()=>{setF({brand:vehicle.brand,model:vehicle.model,year:String(vehicle.year),plate:vehicle.plate,color:vehicle.color});setEditing(true);}} style={{background:'var(--bg-3)',border:'1px solid var(--border)',color:'var(--text-2)',borderRadius:'var(--radius-sm)',padding:'6px 10px',fontSize:12,fontWeight:600,cursor:'pointer'}}>✏ Editar</button>}
         </div>
       </div>
       <div style={{padding:'24px 20px'}}>
@@ -1174,7 +1174,7 @@ const VehicleDetailScreen = ({vehicle, isFav, dispatch, onBack, onGoToDashboard,
             ))}
             <div style={{marginTop:12}}>
               <p style={{fontSize:11,color:'var(--text-3)',marginBottom:4}}>Revisiones completadas</p>
-              <p style={{fontSize:22,fontWeight:700}}>{done}<span style={{fontSize:13,color:'var(--text-3)',fontFamily:'Sora'}}>/{vehicle.maints.length}</span></p>
+              <p style={{fontSize:22,fontWeight:700}}>{done}<span style={{fontSize:13,color:'var(--text-3)'}}>/{vehicle.maints.length}</span></p>
             </div>
           </div>
         )}
