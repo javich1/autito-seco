@@ -250,6 +250,18 @@ const Bar = ({health, color}) => (
     <div style={{height:'100%',width:`${Math.min(Math.round(health*100),100)}%`,background:cMap[color],borderRadius:99,boxShadow:`0 0 8px ${cMap[color]}50`,transition:'width .5s'}}/>
   </div>
 );
+const Ring = ({pct, size=120, stroke=11, color}) => {
+  const r = (size-stroke)/2, c = 2*Math.PI*r;
+  const clamped = Math.min(Math.max(pct,0),1);
+  return (
+    <svg width={size} height={size}>
+      <circle cx={size/2} cy={size/2} r={r} stroke="var(--bg-4)" strokeWidth={stroke} fill="none"/>
+      <circle cx={size/2} cy={size/2} r={r} stroke={color} strokeWidth={stroke} fill="none" strokeLinecap="round"
+        strokeDasharray={c} strokeDashoffset={c*(1-clamped)} transform={`rotate(-90 ${size/2} ${size/2})`}
+        style={{transition:'stroke-dashoffset .6s ease', filter:`drop-shadow(0 0 6px ${color}60)`}}/>
+    </svg>
+  );
+};
 const Btn = ({children,onClick,v='primary',sz='md',style={},disabled=false}) => {
   const bv={primary:{bg:'var(--accent)',color:'#060A07',border:'none'},secondary:{bg:'var(--bg-3)',color:'var(--text-1)',border:'1px solid var(--border)'},ghost:{bg:'transparent',color:'var(--text-2)',border:'1px solid var(--border)'},danger:{bg:'var(--red-dim)',color:'var(--red)',border:'1px solid rgba(232,90,74,.2)'},success:{bg:'var(--green-dim)',color:'var(--green)',border:'1px solid rgba(46,200,100,.2)'}}[v];
   const bs={sm:{p:'7px 14px',fs:'12px'},md:{p:'10px 18px',fs:'14px'},lg:{p:'14px 26px',fs:'15px'}}[sz];
@@ -540,6 +552,8 @@ const Dashboard = ({state, dispatch, vehicle, vehicles, onNav}) => {
 
   const ov = overallStatus(vehicle.maints, vehicle.km);
   const carColor = vehicle.color || '#7C6FFF';
+  const regMaints = vehicle.maints.filter(m=>m.lastDate);
+  const overallHealth = regMaints.length ? Math.min(...regMaints.map(m=>getStatus(m,vehicle.km).health)) : 1;
 
   const applyMaint = (m, date, km, product) => {
     dispatch({type:'APPLY', vid:vehicle.id, mid:m.id, km, date, product});
@@ -602,29 +616,39 @@ const Dashboard = ({state, dispatch, vehicle, vehicles, onNav}) => {
   return (
     <div style={{background:'var(--bg-0)',minHeight:'100vh',paddingBottom:80}}>
       {/* Header */}
-      <div style={{background:'linear-gradient(180deg,var(--bg-2) 0%,var(--bg-0) 100%)',padding:'24px 20px 20px',borderBottom:'1px solid var(--border)'}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:18}}>
+      <div style={{background:'linear-gradient(180deg,var(--bg-2) 0%,var(--bg-0) 100%)',padding:'28px 20px 20px',borderBottom:'1px solid var(--border)'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:6}}>
           <div>
-            <p style={{fontSize:11,color:'var(--text-3)',letterSpacing:'.08em',textTransform:'uppercase',fontWeight:600,marginBottom:4}}>Mi vehículo</p>
-            {/* Nombre + selector si hay más de 1 auto */}
-            <div style={{display:'flex',alignItems:'center',gap:8}}>
-              <h1 style={{fontSize:22,fontWeight:700}}>{vehicle.brand} {vehicle.model}</h1>
+            <p style={{fontSize:11,color:'var(--text-3)',letterSpacing:'.08em',textTransform:'uppercase',fontWeight:600,marginBottom:6}}>Mi vehículo</p>
+            <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+              <h1 style={{fontSize:30,fontWeight:800,letterSpacing:'-.02em',lineHeight:1.05}}>{vehicle.brand} {vehicle.model}</h1>
               {vehicles.length>1&&<button onClick={()=>setVcModal(true)} style={{background:'var(--bg-3)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text-3)',fontSize:11,padding:'2px 7px',cursor:'pointer',fontFamily:'Sora,sans-serif'}}>Cambiar auto ↕</button>}
             </div>
-            <p style={{fontSize:13,color:'var(--text-2)',marginTop:4}}>
+            <p style={{fontSize:13,color:'var(--text-2)',marginTop:6}}>
               <span style={{fontFamily:'Space Mono',background:'var(--bg-3)',padding:'2px 8px',borderRadius:6,fontSize:12,marginRight:8}}>{vehicle.plate.toUpperCase()}</span>
               {vehicle.year}
             </p>
           </div>
-          <Badge color={ov.color} label={ov.label}/>
         </div>
-        <div style={{display:'flex',justifyContent:'center',marginBottom:16}}><CarSVG c={carColor}/></div>
-        <div style={{background:'var(--bg-3)',borderRadius:'var(--radius-md)',padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',border:'1px solid var(--border)'}}>
-          <div>
-            <p style={{fontSize:11,color:'var(--text-3)',marginBottom:2}}>Kilometraje actual</p>
-            <p style={{fontFamily:'Space Mono',fontSize:22,fontWeight:700}}>{Number(vehicle.km).toLocaleString('es-AR')} km</p>
+        <div style={{display:'flex',justifyContent:'center',margin:'12px 0 18px'}}><CarSVG c={carColor}/></div>
+
+        <div style={{display:'grid',gridTemplateColumns:'auto 1fr',gap:14,alignItems:'stretch'}}>
+          <div style={{background:'var(--bg-3)',border:'1px solid var(--border)',borderRadius:'var(--radius-xl)',padding:'14px',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center'}}>
+            <div style={{position:'relative',width:96,height:96}}>
+              <Ring pct={overallHealth} size={96} stroke={9} color={cMap[ov.color]}/>
+              <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center'}}>
+                <p style={{fontFamily:'Space Mono',fontSize:18,fontWeight:800,color:cMap[ov.color]}}>{Math.round(overallHealth*100)}%</p>
+              </div>
+            </div>
+            <p style={{fontSize:11,color:'var(--text-3)',marginTop:8,fontWeight:600,textAlign:'center'}}>{ov.label}</p>
           </div>
-          <Btn onClick={()=>{setNewKm('');setKmModal(true);}} v="ghost" sz="sm">Actualizar</Btn>
+          <div style={{background:'var(--bg-3)',border:'1px solid var(--border)',borderRadius:'var(--radius-xl)',padding:'18px 16px',display:'flex',flexDirection:'column',justifyContent:'space-between'}}>
+            <div>
+              <p style={{fontSize:11,color:'var(--text-3)',marginBottom:4}}>Kilometraje actual</p>
+              <p style={{fontFamily:'Space Mono',fontSize:26,fontWeight:800}}>{Number(vehicle.km).toLocaleString('es-AR')}<span style={{fontSize:14,color:'var(--text-3)',fontWeight:500}}> km</span></p>
+            </div>
+            <Btn onClick={()=>{setNewKm('');setKmModal(true);}} v="ghost" sz="sm" style={{alignSelf:'flex-start',marginTop:10}}>Actualizar</Btn>
+          </div>
         </div>
       </div>
 
